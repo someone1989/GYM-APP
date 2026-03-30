@@ -1,51 +1,116 @@
-# 🏔️ GymClimb Tracker
+<p align="center">
+  <img src="https://img.shields.io/badge/🏔️_GymClimb-Tracker-00d2ff?style=for-the-badge&labelColor=0a0a14" alt="GymClimb"/>
+  <br/><br/>
+  <img src="https://img.shields.io/badge/version-4.0-51cf66?style=flat-square&labelColor=111118" alt="Version"/>
+  <img src="https://img.shields.io/badge/PWA-ready-ffd43b?style=flat-square&labelColor=111118" alt="PWA"/>
+  <img src="https://img.shields.io/badge/offline-100%25-00d2ff?style=flat-square&labelColor=111118" alt="Offline"/>
+  <img src="https://img.shields.io/badge/Garmin_Fenix_7X-integrated-748ffc?style=flat-square&labelColor=111118" alt="Garmin"/>
+</p>
 
-A standalone workout + climbing + hiking tracker optimized for iPhone with Garmin Fenix 7X integration.
+<p align="center">
+  <b>Standalone workout + climbing + hiking tracker</b><br/>
+  Optimized for iPhone · Garmin Fenix 7X integration · Zero server dependency
+</p>
 
-## Features
+---
 
-- **7-day training program** (Mass + Climbing) with customizable exercises
-- **Set-by-set tracking** with weight, reps, RPE, and previous week comparison
-- **1RM calculator** (Epley formula) and automatic PR detection
-- **Climbing log** with bouldering grades (V0–V12), sport grades (4a–8a), flash/redpoint/project tracking
-- **Bouldering pyramid** visualization
-- **Hangboard / finger strength** tracker
-- **Hiking log** with distance, elevation, duration, difficulty
-- **Garmin Fenix 7X integration** – morning check-in (Training Readiness, Body Battery, Sleep Score, Recovery Time) and post-workout data (HR, calories, Training Effect, Load)
-- **Recovery dashboard** with smart overtraining alerts
-- **Charts** – Training Readiness trends, lift progression, weekly volume
-- **Reminders** – Garmin check-in, weekly progress, incomplete workouts
-- **Data export/import** – backup and transfer between devices
-- **PWA support** – install as app on iPhone home screen
-- **100% offline** – no server, no account, all data stored locally
+## ✨ Features
 
-## Setup (GitHub Pages)
+### 🏋️ Training
+- **7-day program** (Mass + Climbing) with fully customizable exercises
+- **Set-by-set tracking** — weight, reps, RPE, previous week comparison
+- **1RM calculator** (Epley formula) with automatic PR detection 🏆
+- **Volume tracking** — per session and weekly totals in tons
+- **Program editor** — add, remove exercises per day in Settings
 
-1. Create a new GitHub repository (e.g. `gymclimb`)
-2. Upload `index.html` to the repository root
-3. Go to **Settings → Pages**
-4. Under "Source", select **Deploy from a branch**
-5. Select **main** branch and **/ (root)** folder
-6. Click **Save**
-7. Wait ~1 minute, your app is live at: `https://YOUR-USERNAME.github.io/gymclimb/`
+### 🧗 Climbing
+- **Route log** — bouldering grades V0–V12, sport grades 4a–8a
+- **Send status** — Flash ⚡ / Redpoint 🔴 / Project 🔧
+- **Bouldering pyramid** — visual progression chart
+- **Hangboard tracker** — grip type, added weight, hang time, edge size
 
-## How to install on iPhone
+### 🥾 Hiking
+- **Trail log** — name, distance, elevation gain, duration
+- **Difficulty rating** — Easy / Moderate / Hard / Expert
 
-1. Open the GitHub Pages URL in **Safari** (not Chrome)
-2. Tap the **Share** button (□↑)
-3. Tap **"Add to Home Screen"**
-4. Name it **GymClimb**
-5. Tap **Add**
-6. Done – the app icon appears on your home screen 🏔️
+### ⌚ Garmin Fenix 7X Integration
+- **Morning check-in** — 4 numbers from your watch glance:
+  - 🎯 Training Readiness · 🔋 Body Battery · 😴 Sleep Score · ⏳ Recovery Time
+- **Post-workout data** — HR, calories, Training Effect, Load (EPOC)
+- **Smart recovery alerts** — warns when readiness or battery are low
+- **Trend charts** — track recovery metrics over weeks
 
-## Data
+### 📊 Dashboard
+- **SVG charts** — readiness trends, lift progression, weekly volume
+- **PR Wall** — ranked by estimated 1RM 🥇🥈🥉
+- **Dismissible reminders** — with badge count on nav bar
 
-- All data is stored in **localStorage** on the device
-- Nothing is sent to any server
-- Use **Settings → Export** to backup your data as JSON
-- Use **Settings → Import** to restore data from a backup
-- Share the JSON file to transfer data to another device
+### 📏 Body Tracking
+- **BMI** — auto-calculated from height + weight with category
+- **Measurements** — waist, chest, arms, body fat %
+- **Weekly progress** — all metrics tracked over time
 
-## Tech
+### 📱 App Features
+- **PWA** — install on home screen, works like native app
+- **100% offline** — no server, no account, no signup
+- **Export / Import** — backup & transfer data as JSON
+- **Dark theme** — designed for gym & outdoor use
+- **iPhone optimized** — safe areas, smooth scrolling, no input zoom
 
-Single HTML file, no build step. Uses React 18, Recharts, and Babel standalone from CDN.
+---
+
+## 🚀 Quick Start
+
+### Deploy to GitHub Pages
+
+```
+1. Create new repository on GitHub
+2. Upload index.html + README.md
+3. Settings → Pages → main branch → Save
+4. Wait 1 min → live at https://USERNAME.github.io/REPO/
+```
+
+### Install on iPhone
+
+```
+1. Open the URL in Safari
+2. Tap Share button (□↑)
+3. Tap "Add to Home Screen"
+4. Done 🏔️
+```
+
+---
+
+## 💾 Where is my data?
+
+| What | Where | Visible to |
+|------|-------|------------|
+| App code | GitHub Pages | Public |
+| Workout data | localStorage on YOUR device | Only you |
+| Garmin entries | localStorage on YOUR device | Only you |
+| Body measurements | localStorage on YOUR device | Only you |
+
+> **Nothing is sent to any server.** All data stays on your phone.
+
+**Backup:** Settings → 📤 Export → saves `.json` file
+**Restore:** Settings → 📥 Import → loads `.json` file
+**Transfer:** Send the JSON file to another device via AirDrop/email
+
+---
+
+## 🛠️ Tech Stack
+
+Single HTML file. No build step. No backend. No dependencies to install.
+
+| Library | CDN | Purpose |
+|---------|-----|---------|
+| React 18 | cdnjs.cloudflare.com | UI framework |
+| Babel Standalone | cdnjs.cloudflare.com | JSX in browser |
+| DM Sans + Space Mono | Google Fonts | Typography |
+| Charts | Built-in SVG | Zero dependency |
+
+---
+
+<p align="center">
+  <sub>Built with ❤️ for gym rats who also climb mountains</sub>
+</p>
