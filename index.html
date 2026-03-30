@@ -1,0 +1,809 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="GymClimb">
+<meta name="theme-color" content="#0a0a14">
+<meta name="mobile-web-app-capable" content="yes">
+<link rel="manifest" href="data:application/json,%7B%22name%22%3A%22GymClimb%20Tracker%22%2C%22short_name%22%3A%22GymClimb%22%2C%22start_url%22%3A%22.%22%2C%22display%22%3A%22standalone%22%2C%22background_color%22%3A%22%230a0a14%22%2C%22theme_color%22%3A%22%230a0a14%22%7D">
+<title>GymClimb Tracker</title>
+<link rel="apple-touch-icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect fill='%230a0a14' width='100' height='100' rx='20'/><text y='68' x='50' text-anchor='middle' font-size='55'>🏔️</text></svg>">
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+<style>
+  * { -webkit-tap-highlight-color: transparent; box-sizing: border-box; margin: 0; padding: 0; }
+  html, body, #root { height: 100%; overscroll-behavior: none; -webkit-text-size-adjust: 100%; background: #0a0a14; }
+  body { font-family: 'DM Sans', sans-serif; }
+  input, select, textarea { font-size: 16px !important; border: none; }
+  ::-webkit-scrollbar { display: none; }
+  @supports (padding-bottom: env(safe-area-inset-bottom)) {
+    .safe-bottom { padding-bottom: calc(100px + env(safe-area-inset-bottom, 20px)) !important; }
+    .nav-safe { padding-bottom: calc(10px + env(safe-area-inset-bottom, 8px)) !important; }
+  }
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script crossorigin src="https://cdnjs.cloudflare.com/ajax/libs/react/18.3.1/umd/react.production.min.js"></script>
+<script crossorigin src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.3.1/umd/react-dom.production.min.js"></script>
+<script crossorigin src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.26.4/babel.min.js"></script>
+<script type="text/babel">
+const { useState, useEffect, useCallback, useRef } = React;
+
+/* Simple SVG Charts - no external dependency */
+function SBar({data,dk,fill,h=140}){if(!data||!data.length)return null;const mx=Math.max(...data.map(d=>+(d[dk])||0),1);const bw=Math.min(30,Math.floor(280/data.length));
+  return (<svg width="100%" viewBox={`0 0 ${data.length*(bw+10)} ${h}`} style={{display:"block"}}>{data.map((d,i)=>{const v=+(d[dk])||0;const bh=(v/mx)*(h-32);
+    return (<g key={i}><rect x={i*(bw+10)+5} y={h-bh-22} width={bw} height={bh} rx={4} fill={fill} opacity={0.85}/><text x={i*(bw+10)+5+bw/2} y={h-6} textAnchor="middle" fill="#999" fontSize="10">{d.name}</text>{v>0&&<text x={i*(bw+10)+5+bw/2} y={h-bh-26} textAnchor="middle" fill="#ccc" fontSize="10">{v}</text>}</g>);})}</svg>);}
+
+function SLine({data,lines,h=150}){if(!data||data.length<2)return null;const allV=lines.flatMap(l=>data.map(d=>+(d[l.key])||0));const mx=Math.max(...allV,1);const mn=Math.min(...allV,0);const rng=mx-mn||1;const p=25;const cw=Math.max(data.length*50,200);
+  return (<svg width="100%" viewBox={`0 0 ${cw} ${h}`} style={{display:"block"}}>{lines.map(line=>{const pts=data.map((d,i)=>{const v=+(d[line.key])||0;const x=p+i*((cw-p*2)/(data.length-1));const y=p+(1-(v-mn)/rng)*(h-p*2);return `${x},${y}`}).join(" ");
+    return (<polyline key={line.key} points={pts} fill="none" stroke={line.color} strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round"/>);})}{data.map((d,i)=>{const x=p+i*((cw-p*2)/(data.length-1));return (<text key={i} x={x} y={h-4} textAnchor="middle" fill="#999" fontSize="10">{d.name}</text>)})}{lines.map(line=>data.map((d,i)=>{const v=+(d[line.key])||0;if(!v)return null;const x=p+i*((cw-p*2)/(data.length-1));const y=p+(1-(v-mn)/rng)*(h-p*2);return (<circle key={`${line.key}-${i}`} cx={x} cy={y} r={3.5} fill={line.color}/>)}))}</svg>);}
+
+/* ═══════════ PROGRAM ═══════════ */
+const DEFAULT_PROGRAM = [
+  { day:1, title:"Chest + Triceps", icon:"💪", type:"workout", exercises:[
+    {id:"d1e1",name:"Bench press",sets:4,reps:"6–8",muscle:"chest"},{id:"d1e2",name:"Incline dumbbell press",sets:4,reps:"8–10",muscle:"chest"},
+    {id:"d1e3",name:"Chest fly (machine/dumbbells)",sets:3,reps:"10–12",muscle:"chest"},{id:"d1e4",name:"Dips",sets:3,reps:"max",muscle:"chest"},
+    {id:"d1e5",name:"Triceps pushdown",sets:3,reps:"10–12",muscle:"triceps"},{id:"d1e6",name:"Skull crushers",sets:3,reps:"8–10",muscle:"triceps"},
+  ]},
+  { day:2, title:"Back + Biceps", icon:"🔥", type:"workout", exercises:[
+    {id:"d2e1",name:"Deadlift",sets:4,reps:"5",muscle:"back"},{id:"d2e2",name:"Pull-ups",sets:4,reps:"max",muscle:"back"},
+    {id:"d2e3",name:"Barbell row",sets:4,reps:"8–10",muscle:"back"},{id:"d2e4",name:"Lat pulldown",sets:3,reps:"10–12",muscle:"back"},
+    {id:"d2e5",name:"Barbell curl",sets:3,reps:"8–10",muscle:"biceps"},{id:"d2e6",name:"Hammer curl",sets:3,reps:"10–12",muscle:"biceps"},
+  ]},
+  { day:3, title:"Rest / Climbing", icon:"🧗", type:"rest", activities:[
+    {name:"Climbing (bouldering or sport)",duration:"60–120 min",note:"Focus on technique"},
+    {name:"Core (plank, leg raises)",duration:"10–15 min",note:""},
+  ]},
+  { day:4, title:"Legs", icon:"🦵", type:"workout", exercises:[
+    {id:"d4e1",name:"Squat",sets:4,reps:"6–8",muscle:"quads"},{id:"d4e2",name:"Romanian deadlift",sets:4,reps:"8–10",muscle:"hamstrings"},
+    {id:"d4e3",name:"Leg press",sets:3,reps:"10–12",muscle:"quads"},{id:"d4e4",name:"Leg curl",sets:3,reps:"10–12",muscle:"hamstrings"},
+    {id:"d4e5",name:"Calf raises",sets:4,reps:"12–15",muscle:"calves"},
+  ]},
+  { day:5, title:"Shoulders + Core", icon:"🎯", type:"workout", exercises:[
+    {id:"d5e1",name:"Overhead press",sets:4,reps:"6–8",muscle:"shoulders"},{id:"d5e2",name:"Lateral raises",sets:4,reps:"12–15",muscle:"shoulders"},
+    {id:"d5e3",name:"Rear delt fly",sets:3,reps:"12–15",muscle:"shoulders"},{id:"d5e4",name:"Shrugs",sets:3,reps:"10–12",muscle:"traps"},
+    {id:"d5e5",name:"Hanging leg raises",sets:3,reps:"12–15",muscle:"core"},{id:"d5e6",name:"Cable crunch",sets:3,reps:"12–15",muscle:"core"},
+  ]},
+  { day:6, title:"Climbing / Active Rest", icon:"⛰️", type:"rest", activities:[
+    {name:"Climbing or light hike",duration:"60–120 min",note:""},
+    {name:"Mobility / stretching",duration:"15 min",note:""},
+  ]},
+  { day:7, title:"Rest", icon:"😴", type:"fullrest", note:"Full rest – focus on nutrition and recovery" },
+];
+
+const MUSCLES = ["chest","triceps","back","biceps","quads","hamstrings","calves","shoulders","traps","core","glutes","forearms"];
+const MC = {chest:"#ff6b6b",triceps:"#ffa94d",back:"#51cf66",biceps:"#339af0",quads:"#cc5de8",hamstrings:"#f06595",calves:"#20c997",shoulders:"#ffd43b",traps:"#ff922b",core:"#748ffc",glutes:"#e599f7",forearms:"#38d9a9"};
+const DN = ["MON","TUE","WED","THU","FRI","SAT","SUN"];
+const BG = ["V0","V1","V2","V3","V4","V5","V6","V7","V8","V9","V10","V11","V12"];
+const SG = ["4a","4b","4c","5a","5b","5c","6a","6a+","6b","6b+","6c","6c+","7a","7a+","7b","7b+","7c","7c+","8a"];
+const GRIPS = ["Half crimp","Open hand","Full crimp","3-finger drag","2-finger pocket"];
+const DIFF = ["Easy","Moderate","Hard","Expert"];
+
+const e1rm = (w, r) => (!w || !r || r < 1) ? 0 : Math.round(w * (1 + r / 30));
+
+/* ═══════════ LOCALSTORAGE ═══════════ */
+const ld = (k, fb) => {
+  try {
+    const v = localStorage.getItem("gc_" + k);
+    return v !== null ? JSON.parse(v) : fb;
+  } catch (e) { return fb; }
+};
+const sd = (k, v) => {
+  try { localStorage.setItem("gc_" + k, JSON.stringify(v)); }
+  catch (e) { console.error(e); }
+};
+
+const rcol = (v) => v >= 60 ? "#51cf66" : v >= 35 ? "#ffd43b" : "#ff4757";
+const rlab = (v) => v >= 60 ? "Ready 💪" : v >= 35 ? "Caution ⚡" : "Rest ⛔";
+const bcol = (v) => v >= 60 ? "#51cf66" : v >= 30 ? "#ffd43b" : "#ff4757";
+const scol = (v) => v >= 70 ? "#51cf66" : v >= 50 ? "#ffd43b" : "#ff4757";
+
+const SZ = { xs:12, sm:14, md:18, lg:22, xl:26, xxl:34, icon:29, iconLg:36, cardTitle:20, cardSub:16, navIcon:26, navLabel:12, input:20, btn:19 };
+const Fn = "'DM Sans',sans-serif";
+const Mo = "'Space Mono',monospace";
+
+/* ═══════════ REST TIMER ═══════════ */
+function RestTimer({ onClose }) {
+  const [s, setS] = useState(90);
+  const [run, setRun] = useState(false);
+  const [ini, setIni] = useState(90);
+  const ref = useRef(null);
+  useEffect(() => {
+    if (run && s > 0) ref.current = setInterval(() => setS(x => x - 1), 1000);
+    else if (s === 0 && run) { setRun(false); try { navigator.vibrate?.(500); } catch (e) {} }
+    return () => clearInterval(ref.current);
+  }, [run, s]);
+  const pct = ini > 0 ? (s / ini) * 100 : 0;
+  const mm = String(Math.floor(s / 60)).padStart(2, "0");
+  const ss = String(s % 60).padStart(2, "0");
+  return (
+    <div style={{position:"fixed",inset:0,zIndex:1000,background:"rgba(0,0,0,0.92)",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",backdropFilter:"blur(12px)",WebkitBackdropFilter:"blur(12px)"}}>
+      <button onClick={onClose} style={{position:"absolute",top:20,right:20,background:"none",border:"none",color:"#888",fontSize:36,cursor:"pointer"}}>✕</button>
+      <p style={{color:"#999",fontSize:SZ.sm,letterSpacing:3,textTransform:"uppercase",marginBottom:24}}>Rest between sets</p>
+      <div style={{width:220,height:220,borderRadius:"50%",background:`conic-gradient(${s===0?"#ff4757":"#00d2ff"} ${pct}%, #1a1a2e ${pct}%)`,display:"flex",alignItems:"center",justifyContent:"center"}}>
+        <div style={{width:186,height:186,borderRadius:"50%",background:"#0d0d1a",display:"flex",alignItems:"center",justifyContent:"center"}}>
+          <span style={{fontSize:56,fontWeight:700,color:s===0?"#ff4757":"#fff",fontFamily:Mo}}>{mm}:{ss}</span>
+        </div>
+      </div>
+      <div style={{display:"flex",gap:12,marginTop:28}}>
+        <button onClick={() => setRun(!run)} style={{padding:"14px 38px",borderRadius:50,border:"none",fontSize:SZ.btn,fontWeight:600,background:run?"#ff4757":"#00d2ff",color:run?"#fff":"#000",cursor:"pointer"}}>{run?"Pause":s===0?"Done!":"Start"}</button>
+        <button onClick={() => {setRun(false);setS(ini)}} style={{padding:"14px 26px",borderRadius:50,border:"1px solid #333",background:"none",color:"#aaa",fontSize:SZ.btn,cursor:"pointer"}}>Reset</button>
+      </div>
+      <div style={{display:"flex",gap:8,marginTop:22}}>
+        {[60,90,120,180].map(p => (
+          <button key={p} onClick={() => {setIni(p);setS(p);setRun(false)}} style={{padding:"9px 18px",borderRadius:22,border:ini===p?"1px solid #00d2ff":"1px solid #333",background:ini===p?"rgba(0,210,255,0.1)":"none",color:ini===p?"#00d2ff":"#999",fontSize:SZ.md,cursor:"pointer"}}>{p}s</button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/* ═══════════ MAIN APP ═══════════ */
+function App() {
+  const [view, setView] = useState("home");
+  const [selDay, setSelDay] = useState(null);
+  const [week, setWeek] = useState(() => ld("wk", 1));
+  const [program, setProgram] = useState(() => ld("program", null) || DEFAULT_PROGRAM);
+  const [wd, setWd] = useState(() => ld("wd", {}));
+  const [cs, setCs] = useState(() => ld("cs", {}));
+  const [prog, setProg] = useState(() => ld("prog", []));
+  const [name, setName] = useState(() => ld("nm", ""));
+  const [height, setHeight] = useState(() => ld("ht", ""));
+  const [ae, setAe] = useState(null);
+  const [climb, setClimb] = useState(() => ld("cl", []));
+  const [finger, setFinger] = useState(() => ld("fi", []));
+  const [prs, setPrs] = useState(() => ld("prs", []));
+  const [garmin, setGarmin] = useState(() => ld("gm", []));
+  const [postWO, setPostWO] = useState(() => ld("pwo", []));
+  const [hikes, setHikes] = useState(() => ld("hikes", []));
+  const [showTimer, setShowTimer] = useState(false);
+  const [dismissed, setDismissed] = useState(() => ld("dismissed", {}));
+  const [showPF, setShowPF] = useState(false);
+  const [dashTab, setDashTab] = useState("recovery");
+  const [outTab, setOutTab] = useState("climb");
+  const [editDay, setEditDay] = useState(null);
+  const [addEx, setAddEx] = useState(null);
+
+  // Save helpers (sync localStorage)
+  const uwd = useCallback((k, v) => { const n = {...wd,[k]:v}; setWd(n); sd("wd",n); }, [wd]);
+  const tog = useCallback((di,ei,si) => { const k=`${week}-${di}-${ei}-${si}`; const n={...cs,[k]:!cs[k]}; setCs(n); sd("cs",n); }, [cs,week]);
+  const chW = useCallback((w) => { setWeek(w); sd("wk",w); }, []);
+  const svN = useCallback((n) => { setName(n); sd("nm",n); }, []);
+  const svProg = useCallback((e) => { const n=[...prog,{...e,week,date:new Date().toISOString()}]; setProg(n); sd("prog",n); }, [prog,week]);
+  const svClimb = useCallback((e) => { const n=[...climb,{...e,id:Date.now(),date:new Date().toISOString(),week}]; setClimb(n); sd("cl",n); }, [climb,week]);
+  const svFinger = useCallback((e) => { const n=[...finger,{...e,id:Date.now(),date:new Date().toISOString(),week}]; setFinger(n); sd("fi",n); }, [finger,week]);
+  const svGarmin = useCallback((e) => { const n=[...garmin,{...e,id:Date.now(),date:new Date().toISOString(),week}]; setGarmin(n); sd("gm",n); }, [garmin,week]);
+  const svPostWO = useCallback((e) => { const n=[...postWO,{...e,id:Date.now(),date:new Date().toISOString(),week}]; setPostWO(n); sd("pwo",n); }, [postWO,week]);
+  const svHike = useCallback((e) => { const n=[...hikes,{...e,id:Date.now(),date:new Date().toISOString(),week}]; setHikes(n); sd("hikes",n); }, [hikes,week]);
+  const saveProgram = useCallback((p) => { setProgram(p); sd("program",p); }, []);
+
+  const removeExercise = useCallback((dayIdx, exIdx) => {
+    const np = program.map((d, i) => i !== dayIdx ? d : {...d, exercises: d.exercises.filter((_, j) => j !== exIdx)});
+    saveProgram(np);
+  }, [program, saveProgram]);
+
+  const addExercise = useCallback((dayIdx, ex) => {
+    const np = program.map((d, i) => i !== dayIdx ? d : {...d, exercises: [...(d.exercises||[]), {...ex, id:`d${dayIdx}e${Date.now()}`}]});
+    saveProgram(np);
+  }, [program, saveProgram]);
+
+  const detectPR = useCallback((exN, w, r) => {
+    if (!w || w <= 0) return false;
+    const v = e1rm(w, r);
+    const ex = prs.find(p => p.exercise === exN);
+    if (!ex || v > ex.e1rm) {
+      const entry = {exercise:exN,weight:Number(w),reps:Number(r),e1rm:v,week,date:new Date().toISOString()};
+      const next = ex ? prs.map(p => p.exercise===exN ? entry : p) : [...prs, entry];
+      setPrs(next); sd("prs", next);
+      return true;
+    }
+    return false;
+  }, [prs, week]);
+
+  const gsk = (d,e,s) => `${week}-${d}-${e}-${s}`;
+  const gdk = (d,e,s,f) => `${week}-${d}-${e}-${s}-${f}`;
+  const pvk = (d,e,s,f) => `${week-1}-${d}-${e}-${s}-${f}`;
+
+  const dayProg = (di) => {
+    const d = program[di]; if (d.type !== "workout" || !d.exercises) return null;
+    let t=0, done=0;
+    d.exercises.forEach((ex,ei) => { for(let s=0; s<ex.sets; s++) { t++; if(cs[gsk(di,ei,s)]) done++; } });
+    return t > 0 ? Math.round((done/t)*100) : 0;
+  };
+
+  const dayVol = (wk,di) => {
+    const d = program[di]; if (d.type !== "workout" || !d.exercises) return 0;
+    let v = 0;
+    d.exercises.forEach((ex,ei) => { for(let s=0; s<ex.sets; s++) { v += (Number(wd[`${wk}-${di}-${ei}-${s}-w`])||0) * (Number(wd[`${wk}-${di}-${ei}-${s}-r`])||0); } });
+    return v;
+  };
+
+  const weekVol = (wk) => { let v=0; for(let i=0;i<7;i++) v+=dayVol(wk,i); return v; };
+  const latestGM = garmin.filter(g => g.week === week).slice(-1)[0];
+  const isLowRec = latestGM && ((Number(latestGM.readiness)||100) < 35 || (Number(latestGM.battery)||100) < 25);
+
+  /* ═══ HOME ═══ */
+  const renderHome = () => (
+    <div style={{padding:"0 16px"}}>
+      <div style={{padding:"24px 0 8px",paddingTop:"calc(24px + env(safe-area-inset-top, 0px))"}}>
+        <p style={{color:"#999",fontSize:SZ.sm,letterSpacing:2,textTransform:"uppercase",margin:0}}>Week {week}</p>
+        <h1 style={{color:"#fff",fontSize:SZ.xxl,fontWeight:700,margin:"4px 0 0"}}>{name ? `Hey, ${name}` : "GymClimb"}</h1>
+      </div>
+
+      <div style={{display:"flex",gap:6,margin:"14px 0",overflowX:"auto",WebkitOverflowScrolling:"touch",paddingBottom:4}}>
+        {Array.from({length:12},(_,i)=>i+1).map(w => (
+          <button key={w} onClick={() => chW(w)} style={{minWidth:44,height:38,borderRadius:19,border:"none",fontSize:SZ.md,fontWeight:600,background:w===week?"#00d2ff":"#151520",color:w===week?"#000":"#999",cursor:"pointer",flexShrink:0}}>W{w}</button>
+        ))}
+      </div>
+
+      {/* Garmin Card */}
+      <GarminCard gm={latestGM} isLow={isLowRec} onAdd={() => setView("garmin")} />
+
+      {isLowRec && (
+        <div style={{background:"rgba(255,71,87,0.08)",border:"1px solid rgba(255,71,87,0.25)",borderRadius:14,padding:"14px 16px",marginBottom:12}}>
+          <p style={{color:"#ff4757",fontSize:SZ.md,fontWeight:600,margin:0}}>⚠️ Low recovery – consider rest</p>
+        </div>
+      )}
+
+      <div style={{display:"flex",flexDirection:"column",gap:8}}>
+        {program.map((day, idx) => {
+          const p = dayProg(idx); const v = dayVol(week, idx);
+          return (
+            <button key={idx} onClick={() => {setSelDay(idx);setView("day");setAe(null)}}
+              style={{background:"#111118",borderRadius:16,padding:"16px 18px",border:p===100?"1px solid rgba(0,210,255,0.25)":"1px solid #1a1a25",cursor:"pointer",textAlign:"left",display:"flex",alignItems:"center",gap:14,width:"100%"}}>
+              <div style={{width:52,height:52,borderRadius:14,display:"flex",alignItems:"center",justifyContent:"center",fontSize:SZ.icon,flexShrink:0,background:day.type==="workout"?"rgba(0,210,255,0.07)":day.type==="rest"?"rgba(81,207,102,0.07)":"rgba(255,255,255,0.03)"}}>{day.icon}</div>
+              <div style={{flex:1,minWidth:0}}>
+                <p style={{color:"#999",fontSize:SZ.sm,letterSpacing:1,margin:0}}>{DN[idx]} – Day {day.day}</p>
+                <p style={{color:"#eee",fontSize:SZ.cardTitle,fontWeight:600,margin:"3px 0 0"}}>{day.title}</p>
+                {day.type==="workout"&&day.exercises&&<p style={{color:"#777",fontSize:SZ.sm,margin:"2px 0 0"}}>{day.exercises.length} exercises{v>0?` · ${(v/1000).toFixed(1)}t`:""}</p>}
+              </div>
+              {p!==null&&<p style={{color:p===100?"#00d2ff":p>0?"#ffd43b":"#555",fontSize:SZ.lg,fontWeight:700,margin:0,fontFamily:Mo,flexShrink:0}}>{p}%</p>}
+              <div style={{color:"#555",fontSize:SZ.lg,flexShrink:0}}>›</div>
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Reminders */}
+      {(() => {
+        const dk = `${week}`;
+        const dis = dismissed[dk] || [];
+        const dismiss = (id) => {
+          const next = { ...dismissed, [dk]: [...dis, id] };
+          setDismissed(next); sd("dismissed", next);
+        };
+        const allRem = [];
+        if (garmin.filter(g=>g.week===week).length===0) allRem.push({id:"garmin",icon:"⌚",text:"Add Garmin morning check-in",color:"#748ffc",action:()=>setView("garmin")});
+        if (!prog.find(p=>p.week===week)) allRem.push({id:"progress",icon:"⚖️",text:"Enter weekly body progress",color:"#ffd43b",action:()=>setView("progress")});
+        const inc = program.filter((d,i) => d.type==="workout"&&dayProg(i)!==null&&dayProg(i)<100).length;
+        if (inc>0) allRem.push({id:"workouts",icon:"🏋️",text:`${inc} workout day${inc>1?"s":""} not completed`,color:"#00d2ff"});
+        if (climb.filter(c=>c.week===week).length===0) allRem.push({id:"climb",icon:"🧗",text:"No climbing logged this week",color:"#51cf66",action:()=>setView("outdoor")});
+        if (hikes.filter(h=>h.week===week).length===0) allRem.push({id:"hike",icon:"🥾",text:"No hikes logged this week",color:"#20c997",action:()=>setView("outdoor")});
+        
+        const rem = allRem.filter(r => !dis.includes(r.id));
+        if (rem.length === 0) return null;
+        return (
+          <div style={{marginTop:14,background:"linear-gradient(135deg,#111118,#151520)",borderRadius:16,padding:"14px 16px",border:"1px solid #1a1a25"}}>
+            <p style={{color:"#999",fontSize:SZ.sm,letterSpacing:2,margin:"0 0 10px",fontWeight:600}}>📋 REMINDERS ({rem.length})</p>
+            {rem.map((r) => (
+              <div key={r.id} style={{display:"flex",alignItems:"center",gap:10,padding:"10px 12px",background:"rgba(255,255,255,0.02)",borderRadius:11,border:"1px solid #1a1a25",marginBottom:6}}>
+                <span style={{fontSize:SZ.icon}}>{r.icon}</span>
+                <p onClick={r.action||(()=>{})} style={{color:r.color,fontSize:SZ.cardSub,fontWeight:500,margin:0,flex:1,cursor:r.action?"pointer":"default"}}>{r.text}{r.action?" →":""}</p>
+                <button onClick={(e)=>{e.stopPropagation();dismiss(r.id)}} style={{width:30,height:30,borderRadius:8,border:"none",background:"rgba(255,255,255,0.05)",color:"#555",fontSize:SZ.sm,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>✕</button>
+              </div>
+            ))}
+          </div>
+        );
+      })()}
+
+      <div style={{display:"flex",gap:8,marginTop:16}}>
+        <button onClick={() => setShowTimer(true)} style={{flex:1,padding:"14px",borderRadius:14,border:"1px solid #222",background:"#111118",color:"#00d2ff",fontSize:SZ.md,fontWeight:600,cursor:"pointer"}}>⏱ Timer</button>
+        <button onClick={() => setView("progress")} style={{flex:1,padding:"14px",borderRadius:14,border:"1px solid #222",background:"#111118",color:"#ffd43b",fontSize:SZ.md,fontWeight:600,cursor:"pointer"}}>⚖️ Progress</button>
+      </div>
+    </div>
+  );
+
+  /* ═══ DAY VIEW ═══ */
+  const renderDay = () => {
+    const day = program[selDay]; const v = dayVol(week,selDay);
+    const dayPWO = postWO.filter(p=>p.week===week&&p.day===selDay).slice(-1)[0];
+    return (
+      <div style={{padding:"0 16px"}}>
+        <div style={{display:"flex",alignItems:"center",padding:"16px 0",paddingTop:"calc(16px + env(safe-area-inset-top, 0px))",gap:10}}>
+          <button onClick={() => setView("home")} style={{width:40,height:40,borderRadius:12,border:"1px solid #222",background:"#111",color:"#888",fontSize:SZ.lg,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}>‹</button>
+          <div style={{flex:1}}>
+            <p style={{color:"#999",fontSize:SZ.sm,letterSpacing:1,margin:0}}>{DN[selDay]} – W{week}</p>
+            <h2 style={{color:"#fff",fontSize:SZ.xl,fontWeight:700,margin:"2px 0 0"}}>{day.icon} {day.title}</h2>
+          </div>
+          {day.type==="workout"&&<>
+            {v>0&&<span style={{color:"#777",fontSize:SZ.sm,fontFamily:Mo}}>{(v/1000).toFixed(1)}t</span>}
+            <button onClick={() => setShowTimer(true)} style={{width:42,height:42,borderRadius:12,border:"1px solid rgba(0,210,255,0.3)",background:"rgba(0,210,255,0.07)",color:"#00d2ff",fontSize:SZ.lg,cursor:"pointer"}}>⏱</button>
+          </>}
+        </div>
+
+        {latestGM&&day.type==="workout"&&(
+          <div style={{display:"flex",gap:7,marginBottom:12}}>
+            {[{l:"Ready",v:latestGM.readiness,c:rcol(Number(latestGM.readiness)||0)},{l:"Battery",v:latestGM.battery,c:bcol(Number(latestGM.battery)||0)},{l:"Sleep",v:latestGM.sleep,c:scol(Number(latestGM.sleep)||0)},{l:"Recov.",v:`${latestGM.recovery||"–"}h`,c:"#748ffc"}].map(x=>
+              <div key={x.l} style={{flex:1,background:"#111118",borderRadius:10,padding:"8px 5px",textAlign:"center",border:"1px solid #1a1a25"}}>
+                <p style={{color:"#777",fontSize:SZ.xs,letterSpacing:1,margin:0}}>{x.l}</p>
+                <p style={{color:x.c,fontSize:SZ.cardTitle,fontWeight:700,margin:"2px 0 0",fontFamily:Mo}}>{x.v||"–"}</p>
+              </div>
+            )}
+          </div>
+        )}
+
+        {day.type==="workout"&&day.exercises&&day.exercises.map((ex,ei) => {
+          const isO = ae===`${selDay}-${ei}`;
+          const best = e1rm(Math.max(...Array.from({length:ex.sets},(_,s)=>Number(wd[gdk(selDay,ei,s,"w")])||0)),Math.max(...Array.from({length:ex.sets},(_,s)=>Number(wd[gdk(selDay,ei,s,"r")])||0)));
+          return (
+            <div key={ei} style={{background:"#111118",borderRadius:14,padding:"14px 16px",marginBottom:9,border:"1px solid #1a1a25"}}>
+              <div onClick={() => setAe(isO?null:`${selDay}-${ei}`)} style={{display:"flex",alignItems:"center",justifyContent:"space-between",cursor:"pointer",marginBottom:isO?10:0}}>
+                <div style={{display:"flex",alignItems:"center",gap:10}}>
+                  <div style={{width:5,height:28,borderRadius:3,background:MC[ex.muscle]||"#999"}}/>
+                  <div>
+                    <p style={{color:"#eee",fontSize:SZ.md,fontWeight:600,margin:0}}>{ex.name}</p>
+                    <p style={{color:"#999",fontSize:SZ.sm,margin:"2px 0 0"}}>{ex.sets}×{ex.reps}{best>0?` · 1RM≈${best}`:""}</p>
+                  </div>
+                </div>
+                <span style={{color:"#555",fontSize:SZ.md,transform:isO?"rotate(90deg)":"none",transition:"transform 0.2s"}}>›</span>
+              </div>
+              <div style={{display:"flex",flexDirection:"column",gap:5}}>
+                {Array.from({length:ex.sets},(_,si) => {
+                  const sk=gsk(selDay,ei,si), done=cs[sk], wk=gdk(selDay,ei,si,"w"), rk=gdk(selDay,ei,si,"r"), rpek=gdk(selDay,ei,si,"rpe");
+                  const pw=wd[pvk(selDay,ei,si,"w")], pr=wd[pvk(selDay,ei,si,"r")];
+                  const cw=Number(wd[wk])||0, cr=Number(wd[rk])||0, isPR=cw>0&&pw&&cw>Number(pw);
+                  return (
+                    <div key={si} style={{display:"flex",alignItems:"center",gap:6,padding:isO?"9px 10px":"5px 10px",background:done?"rgba(0,210,255,0.04)":"rgba(255,255,255,0.015)",borderRadius:9}}>
+                      <button onClick={() => {tog(selDay,ei,si);if(!done&&cw>0)detectPR(ex.name,cw,cr)}}
+                        style={{width:30,height:30,borderRadius:8,border:"none",flexShrink:0,background:done?"#00d2ff":"#222",color:done?"#000":"#999",fontSize:SZ.sm,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",fontWeight:700,minWidth:30}}>
+                        {done?"✓":si+1}
+                      </button>
+                      {isO?(
+                        <div style={{flex:1,display:"flex",gap:6,alignItems:"flex-end"}}>
+                          <div style={{flex:1}}>
+                            <div style={{display:"flex",justifyContent:"space-between"}}><label style={{color:"#999",fontSize:SZ.xs}}>KG</label>{pw&&<span style={{color:"#555",fontSize:SZ.xs}}>prev: {pw}</span>}</div>
+                            <input type="number" inputMode="decimal" placeholder="–" value={wd[wk]||""} onChange={e=>uwd(wk,e.target.value)} style={{width:"100%",padding:"6px 8px",borderRadius:8,border:isPR?"1px solid #ffd43b":"1px solid #222",background:isPR?"rgba(255,212,59,0.04)":"#0a0a14",color:"#fff",fontSize:SZ.input,fontFamily:Mo,outline:"none",boxSizing:"border-box"}}/>
+                          </div>
+                          <div style={{flex:1}}>
+                            <div style={{display:"flex",justifyContent:"space-between"}}><label style={{color:"#999",fontSize:SZ.xs}}>REPS</label>{pr&&<span style={{color:"#555",fontSize:SZ.xs}}>prev: {pr}</span>}</div>
+                            <input type="number" inputMode="numeric" placeholder={ex.reps} value={wd[rk]||""} onChange={e=>uwd(rk,e.target.value)} style={{width:"100%",padding:"6px 8px",borderRadius:8,border:"1px solid #222",background:"#0a0a14",color:"#fff",fontSize:SZ.input,fontFamily:Mo,outline:"none",boxSizing:"border-box"}}/>
+                          </div>
+                          <div style={{width:52}}>
+                            <label style={{color:"#999",fontSize:SZ.xs}}>RPE</label>
+                            <select value={wd[rpek]||""} onChange={e=>uwd(rpek,e.target.value)} style={{width:"100%",padding:"6px 2px",borderRadius:8,border:"1px solid #222",background:"#0a0a14",color:wd[rpek]?"#ffa94d":"#555",fontSize:SZ.sm,fontFamily:Mo,outline:"none"}}>
+                              <option value="">–</option>{[6,7,8,9,10].map(v=><option key={v} value={v}>{v}</option>)}
+                            </select>
+                          </div>
+                          {isPR&&<span style={{fontSize:SZ.md}}>🏆</span>}
+                        </div>
+                      ):(
+                        <div style={{flex:1,display:"flex",justifyContent:"space-between"}}>
+                          <span style={{color:"#999",fontSize:SZ.cardSub,fontFamily:Mo}}>Set {si+1}</span>
+                          <span style={{color:done?"#00d2ff":"#555",fontSize:SZ.cardSub,fontFamily:Mo}}>{wd[wk]?`${wd[wk]}kg×${wd[rk]||"?"}${wd[rpek]?` @${wd[rpek]}`:""}`:("–")}</span>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+              {isO&&<input type="text" placeholder="Notes..." value={wd[`${week}-${selDay}-${ei}-note`]||""} onChange={e=>uwd(`${week}-${selDay}-${ei}-note`,e.target.value)} style={{width:"100%",padding:"8px 10px",borderRadius:8,border:"1px solid #1a1a25",background:"#0a0a14",color:"#999",fontSize:SZ.sm,outline:"none",boxSizing:"border-box",marginTop:7}}/>}
+            </div>
+          );
+        })}
+
+        {day.type==="workout"&&<button onClick={() => setAddEx(addEx===selDay?null:selDay)} style={{width:"100%",padding:"13px",borderRadius:13,border:"1px dashed #333",background:addEx===selDay?"rgba(0,210,255,0.05)":"none",color:"#999",fontSize:SZ.cardSub,fontWeight:600,cursor:"pointer",marginBottom:8}}>{addEx===selDay?"Cancel":"+ Add exercise"}</button>}
+        {addEx===selDay&&<AddExForm onSave={(ex) => {addExercise(selDay,ex);setAddEx(null)}}/>}
+
+        {day.type==="workout"&&<PostWOCard pwo={dayPWO} onSave={(e) => svPostWO({...e,day:selDay})}/>}
+
+        {day.type==="rest"&&day.activities&&day.activities.map((a,i) => {
+          const rk=`${week}-${selDay}-rest-${i}`; const done=cs[rk];
+          return (
+            <div key={i} style={{background:done?"rgba(81,207,102,0.05)":"#111118",borderRadius:14,padding:"16px 18px",marginBottom:9,border:done?"1px solid rgba(81,207,102,0.25)":"1px solid #1a1a25",display:"flex",alignItems:"center",gap:14}}>
+              <button onClick={() => {const n={...cs,[rk]:!done};setCs(n);sd("cs",n)}} style={{width:38,height:38,borderRadius:10,border:"none",flexShrink:0,background:done?"#51cf66":"#222",color:done?"#000":"#999",fontSize:SZ.md,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",fontWeight:700,minWidth:38}}>{done?"✓":"○"}</button>
+              <div style={{flex:1}}>
+                <p style={{color:done?"#aaa":"#eee",fontSize:SZ.md,fontWeight:600,margin:0,textDecoration:done?"line-through":"none"}}>{a.name}</p>
+                <p style={{color:"#51cf66",fontSize:SZ.cardSub,margin:"4px 0 0"}}>⏱ {a.duration}</p>
+                {a.note&&<p style={{color:"#999",fontSize:SZ.sm,margin:"3px 0 0"}}>{a.note}</p>}
+              </div>
+            </div>
+          );
+        })}
+
+        {day.type==="fullrest"&&(() => {
+          const rk=`${week}-${selDay}-fullrest`; const done=cs[rk];
+          return (
+            <div style={{background:done?"rgba(81,207,102,0.05)":"#111118",borderRadius:14,padding:"30px 18px",border:done?"1px solid rgba(81,207,102,0.25)":"1px solid #1a1a25",textAlign:"center"}}>
+              <div style={{fontSize:52,marginBottom:10}}>😴</div>
+              <p style={{color:"#eee",fontSize:SZ.cardTitle,fontWeight:600,margin:"0 0 16px"}}>{day.note}</p>
+              <button onClick={() => {const n={...cs,[rk]:!done};setCs(n);sd("cs",n)}} style={{padding:"13px 34px",borderRadius:12,border:"none",background:done?"#51cf66":"#222",color:done?"#000":"#aaa",fontSize:SZ.btn,fontWeight:700,cursor:"pointer"}}>{done?"✓ Completed":"Mark as done"}</button>
+            </div>
+          );
+        })()}
+      </div>
+    );
+  };
+
+  /* ═══ OUTDOOR ═══ */
+  const renderOutdoor = () => (
+    <div style={{padding:"0 16px"}}>
+      <h2 style={{color:"#fff",fontSize:SZ.xl,fontWeight:700,padding:"20px 0 6px",paddingTop:"calc(20px + env(safe-area-inset-top, 0px))",margin:0}}>🏔️ Outdoor</h2>
+      <div style={{display:"flex",gap:6,margin:"8px 0 16px"}}>
+        {[["climb","🧗 Climb"],["hike","🥾 Hike"],["finger","🤏 Fingers"],["pyramid","📊 Pyramid"]].map(([id,l]) => (
+          <button key={id} onClick={() => setOutTab(id)} style={{padding:"8px 14px",borderRadius:10,border:"none",fontSize:SZ.sm,fontWeight:600,background:outTab===id?"#51cf66":"#151520",color:outTab===id?"#000":"#999",cursor:"pointer"}}>{l}</button>
+        ))}
+      </div>
+      {outTab==="climb"&&<ClimbLog climb={climb} week={week} onSave={svClimb}/>}
+      {outTab==="hike"&&<HikeLog hikes={hikes} week={week} onSave={svHike}/>}
+      {outTab==="finger"&&<FingerLog finger={finger} week={week} onSave={svFinger}/>}
+      {outTab==="pyramid"&&<div><p style={{color:"#999",fontSize:SZ.sm,letterSpacing:2,margin:"0 0 10px"}}>BOULDERING PYRAMID</p>
+        {BG.slice().reverse().map(g => {const cnt=climb.filter(c=>c.grade===g&&(c.status==="flash"||c.status==="redpoint")).length;
+          return (<div key={g} style={{display:"flex",alignItems:"center",gap:8,marginBottom:4}}>
+            <span style={{color:"#aaa",fontSize:SZ.sm,width:28,textAlign:"right",fontFamily:Mo}}>{g}</span>
+            <div style={{flex:1,height:22,background:"#151520",borderRadius:4,overflow:"hidden"}}><div style={{width:`${Math.min(cnt*20,100)}%`,height:"100%",background:`hsl(${BG.indexOf(g)*25},70%,50%)`,borderRadius:4}}/></div>
+            <span style={{color:"#999",fontSize:SZ.sm,width:20,fontFamily:Mo}}>{cnt}</span>
+          </div>);
+        })}
+      </div>}
+    </div>
+  );
+
+  /* ═══ DASHBOARD ═══ */
+  const renderDash = () => {
+    const readData=garmin.filter(g=>g.readiness).map(g=>({name:`W${g.week}`,readiness:Number(g.readiness)||0,battery:Number(g.battery)||0,sleep:Number(g.sleep)||0}));
+    const volData=Array.from({length:week},(_,i)=>({name:`W${i+1}`,vol:Math.round(weekVol(i+1)/1000)}));
+    const liftData=prog.map(p=>({name:`W${p.week}`,bench:Number(p.bench)||0,squat:Number(p.squat)||0,deadlift:Number(p.deadlift)||0}));
+    return (
+      <div style={{padding:"0 16px"}}>
+        <h2 style={{color:"#fff",fontSize:SZ.xl,fontWeight:700,padding:"20px 0 6px",paddingTop:"calc(20px + env(safe-area-inset-top, 0px))",margin:0}}>📊 Dashboard</h2>
+        <div style={{display:"flex",gap:5,margin:"8px 0 16px",overflowX:"auto",paddingBottom:3}}>
+          {[["recovery","⌚ Recovery"],["lifts","🏋️ Lifts"],["volume","📈 Volume"],["prs","🏆 PRs"]].map(([id,l]) => (
+            <button key={id} onClick={() => setDashTab(id)} style={{padding:"8px 14px",borderRadius:10,border:"none",fontSize:SZ.sm,fontWeight:600,background:dashTab===id?"#00d2ff":"#151520",color:dashTab===id?"#000":"#999",cursor:"pointer",flexShrink:0}}>{l}</button>
+          ))}
+        </div>
+        {dashTab==="recovery"&&(readData.length>0?<CC t="Training Readiness Trend" c="#51cf66"><SLine data={readData} lines={[{key:"readiness",color:"#51cf66"},{key:"battery",color:"#00d2ff"},{key:"sleep",color:"#748ffc"}]}/><div style={{display:"flex",gap:12,justifyContent:"center",marginTop:6}}>{[["Readiness","#51cf66"],["Battery","#00d2ff"],["Sleep","#748ffc"]].map(([l,c])=><span key={l} style={{color:c,fontSize:SZ.xs}}>● {l}</span>)}</div></CC>:<p style={{color:"#555",fontSize:SZ.md,textAlign:"center",padding:28}}>Add Garmin data to see charts</p>)}
+        {dashTab==="lifts"&&(liftData.length>0?<CC t="Bench / Squat / Deadlift (kg)" c="#ff6b6b"><SLine data={liftData} lines={[{key:"bench",color:"#ff6b6b"},{key:"squat",color:"#cc5de8"},{key:"deadlift",color:"#51cf66"}]}/><div style={{display:"flex",gap:12,justifyContent:"center",marginTop:6}}>{[["Bench","#ff6b6b"],["Squat","#cc5de8"],["Deadlift","#51cf66"]].map(([l,c])=><span key={l} style={{color:c,fontSize:SZ.xs}}>● {l}</span>)}</div></CC>:<p style={{color:"#555",fontSize:SZ.md,textAlign:"center",padding:28}}>Add weekly progress to see charts</p>)}
+        {dashTab==="volume"&&<CC t="Weekly Volume (tons)" c="#00d2ff"><SBar data={volData} dk="vol" fill="#00d2ff"/></CC>}
+        {dashTab==="prs"&&<div>{prs.length===0?<p style={{color:"#555",fontSize:SZ.md,textAlign:"center",padding:28}}>No PRs yet</p>:prs.sort((a,b)=>b.e1rm-a.e1rm).map((p,i)=>(<div key={i} style={{background:"#111118",borderRadius:13,padding:"14px 16px",marginBottom:7,border:"1px solid rgba(255,212,59,0.12)",display:"flex",alignItems:"center",gap:12}}><span style={{fontSize:SZ.icon}}>{i===0?"🥇":i===1?"🥈":i===2?"🥉":"🏆"}</span><div style={{flex:1}}><p style={{color:"#eee",fontSize:SZ.md,fontWeight:600,margin:0}}>{p.exercise}</p><p style={{color:"#999",fontSize:SZ.sm,margin:"2px 0 0"}}>W{p.week} · {p.weight}kg × {p.reps}</p></div><div style={{textAlign:"right"}}><p style={{color:"#ffd43b",fontSize:SZ.lg,fontWeight:700,margin:0,fontFamily:Mo}}>{p.e1rm}</p><p style={{color:"#999",fontSize:SZ.xs,margin:0}}>est. 1RM</p></div></div>))}</div>}
+      </div>
+    );
+  };
+
+  /* ═══ SETTINGS ═══ */
+  const renderSettings = () => (
+    <div style={{padding:"0 16px"}}>
+      <h2 style={{color:"#fff",fontSize:SZ.xl,fontWeight:700,padding:"20px 0 12px",paddingTop:"calc(20px + env(safe-area-inset-top, 0px))",margin:0}}>⚙️ Settings</h2>
+      <div style={{background:"#111118",borderRadius:14,padding:"18px",border:"1px solid #1a1a25",marginBottom:10}}>
+        <p style={{color:"#999",fontSize:SZ.xs,letterSpacing:2,margin:"0 0 8px"}}>PROFILE</p>
+        <div style={{display:"flex",gap:8,marginBottom:10}}>
+          <input type="text" placeholder="Enter name..." value={name} onChange={e=>setName(e.target.value)} style={{flex:1,padding:"11px 14px",borderRadius:10,border:"1px solid #222",background:"#0a0a14",color:"#fff",fontSize:SZ.md,outline:"none"}}/>
+          <button onClick={() => {svN(name);sd("ht",height)}} style={{padding:"11px 20px",borderRadius:10,border:"none",background:"#00d2ff",color:"#000",fontWeight:600,fontSize:SZ.md,cursor:"pointer"}}>Save</button>
+        </div>
+        <div style={{display:"flex",gap:8,alignItems:"center"}}>
+          <div style={{flex:1}}>
+            <label style={{color:"#999",fontSize:SZ.xs}}>Height (cm)</label>
+            <input type="number" inputMode="numeric" placeholder="180" value={height} onChange={e=>{setHeight(e.target.value);sd("ht",e.target.value)}} style={{width:"100%",padding:"10px",borderRadius:10,border:"1px solid #222",background:"#0a0a14",color:"#fff",fontSize:SZ.input,fontFamily:Mo,outline:"none",boxSizing:"border-box",marginTop:3}}/>
+          </div>
+          {height && proArr.length > 0 && (() => {
+            const lastW = proArr.slice(-1)[0]?.bodyWeight;
+            if (!lastW) return null;
+            const hm = Number(height) / 100;
+            const bmi = (Number(lastW) / (hm * hm)).toFixed(1);
+            const cat = bmi < 18.5 ? "Underweight" : bmi < 25 ? "Normal" : bmi < 30 ? "Overweight" : "Obese";
+            const col = bmi < 18.5 ? "#339af0" : bmi < 25 ? "#51cf66" : bmi < 30 ? "#ffd43b" : "#ff4757";
+            return (
+              <div style={{flex:1,background:"#0a0a14",borderRadius:10,padding:"10px",textAlign:"center",marginTop:16}}>
+                <p style={{color:"#999",fontSize:SZ.xs,margin:0}}>BMI</p>
+                <p style={{color:col,fontSize:SZ.xl,fontWeight:700,margin:"2px 0 0",fontFamily:Mo}}>{bmi}</p>
+                <p style={{color:col,fontSize:SZ.xs,margin:"2px 0 0"}}>{cat}</p>
+              </div>
+            );
+          })()}
+        </div>
+        {height && <p style={{color:"#777",fontSize:SZ.xs,margin:"8px 0 0",fontStyle:"italic"}}>Note: BMI is less accurate for muscular builds - use body measurements for better tracking.</p>}
+      </div>
+      <div style={{background:"#111118",borderRadius:14,padding:"18px",border:"1px solid #1a1a25",marginBottom:10}}>
+        <p style={{color:"#999",fontSize:SZ.xs,letterSpacing:2,margin:"0 0 8px"}}>CURRENT WEEK</p>
+        <div style={{display:"flex",gap:5,flexWrap:"wrap"}}>
+          {Array.from({length:12},(_,i)=>i+1).map(w=>(<button key={w} onClick={() => chW(w)} style={{width:42,height:38,borderRadius:10,border:"none",fontSize:SZ.md,fontWeight:600,background:w===week?"#00d2ff":"#1a1a25",color:w===week?"#000":"#999",cursor:"pointer"}}>{w}</button>))}
+        </div>
+      </div>
+      <div style={{background:"#111118",borderRadius:14,padding:"18px",border:"1px solid #1a1a25",marginBottom:10}}>
+        <p style={{color:"#999",fontSize:SZ.xs,letterSpacing:2,margin:"0 0 8px"}}>PROGRAM EDITOR</p>
+        <p style={{color:"#777",fontSize:SZ.sm,margin:"0 0 12px"}}>Tap a day to edit exercises.</p>
+        {program.map((day,di) => {
+          if (day.type!=="workout") return null;
+          const isOpen=editDay===di;
+          return (
+            <div key={di} style={{marginBottom:8}}>
+              <button onClick={() => setEditDay(isOpen?null:di)} style={{width:"100%",padding:"13px 15px",borderRadius:11,border:"1px solid #1a1a25",background:isOpen?"rgba(0,210,255,0.05)":"#0a0a14",color:"#eee",fontSize:SZ.md,fontWeight:600,cursor:"pointer",textAlign:"left",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                <span>{day.icon} {day.title}</span><span style={{color:"#777",fontSize:SZ.sm}}>{day.exercises?.length||0} ex {isOpen?"▼":"›"}</span>
+              </button>
+              {isOpen&&<div style={{padding:"10px 0 0"}}>
+                {day.exercises&&day.exercises.map((ex,ei)=>(<div key={ei} style={{display:"flex",alignItems:"center",gap:8,padding:"9px 10px",background:"#0a0a14",borderRadius:9,marginBottom:4}}>
+                  <div style={{width:4,height:22,borderRadius:2,background:MC[ex.muscle]||"#999"}}/>
+                  <div style={{flex:1}}><p style={{color:"#ccc",fontSize:SZ.cardSub,margin:0}}>{ex.name}</p><p style={{color:"#777",fontSize:SZ.xs,margin:"1px 0 0"}}>{ex.sets}×{ex.reps} · {ex.muscle}</p></div>
+                  <button onClick={() => removeExercise(di,ei)} style={{width:30,height:30,borderRadius:8,border:"none",background:"rgba(255,71,87,0.1)",color:"#ff4757",fontSize:SZ.sm,cursor:"pointer"}}>✕</button>
+                </div>))}
+                <AddExForm onSave={(ex) => addExercise(di,ex)} compact/>
+              </div>}
+            </div>
+          );
+        })}
+        <button onClick={() => {if(confirm("Reset program to defaults?")){saveProgram(DEFAULT_PROGRAM)}}} style={{width:"100%",padding:"11px",borderRadius:10,border:"1px solid #333",background:"none",color:"#999",fontSize:SZ.sm,fontWeight:600,cursor:"pointer",marginTop:8}}>Reset to default program</button>
+      </div>
+      <button onClick={() => setView("garmin")} style={{width:"100%",padding:"15px",borderRadius:14,border:"1px solid rgba(116,143,252,0.3)",background:"rgba(116,143,252,0.05)",color:"#748ffc",fontSize:SZ.md,fontWeight:600,cursor:"pointer",marginBottom:10}}>⌚ Garmin Fenix 7X Check-in</button>
+      <button onClick={() => setView("progress")} style={{width:"100%",padding:"15px",borderRadius:14,border:"1px solid rgba(255,212,59,0.3)",background:"rgba(255,212,59,0.05)",color:"#ffd43b",fontSize:SZ.md,fontWeight:600,cursor:"pointer",marginBottom:10}}>⚖️ Weekly Body Progress</button>
+      {/* Export/Import */}
+      <div style={{background:"#111118",borderRadius:14,padding:"18px",border:"1px solid #1a1a25",marginBottom:10}}>
+        <p style={{color:"#999",fontSize:SZ.xs,letterSpacing:2,margin:"0 0 10px"}}>DATA BACKUP</p>
+        <button onClick={() => {
+          const data = {};
+          for (let i = 0; i < localStorage.length; i++) {
+            const k = localStorage.key(i);
+            if (k.startsWith("gc_")) data[k] = localStorage.getItem(k);
+          }
+          const blob = new Blob([JSON.stringify(data, null, 2)], {type:"application/json"});
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement("a");
+          a.href = url; a.download = `gymclimb-backup-W${week}.json`;
+          a.click(); URL.revokeObjectURL(url);
+        }} style={{width:"100%",padding:"14px",borderRadius:12,border:"1px solid rgba(81,207,102,0.3)",background:"rgba(81,207,102,0.05)",color:"#51cf66",fontSize:SZ.md,fontWeight:600,cursor:"pointer",marginBottom:8}}>
+          📤 Export data (JSON)
+        </button>
+        <label style={{width:"100%",display:"block",padding:"14px",borderRadius:12,border:"1px solid rgba(0,210,255,0.3)",background:"rgba(0,210,255,0.05)",color:"#00d2ff",fontSize:SZ.md,fontWeight:600,cursor:"pointer",textAlign:"center"}}>
+          📥 Import data (JSON)
+          <input type="file" accept=".json" style={{display:"none"}} onChange={(e) => {
+            const file = e.target.files[0]; if (!file) return;
+            const reader = new FileReader();
+            reader.onload = (ev) => {
+              try {
+                const data = JSON.parse(ev.target.result);
+                if (confirm(`Import ${Object.keys(data).length} data entries? This will overwrite current data.`)) {
+                  Object.entries(data).forEach(([k, v]) => localStorage.setItem(k, v));
+                  location.reload();
+                }
+              } catch (err) { alert("Invalid file format"); }
+            };
+            reader.readAsText(file);
+          }} />
+        </label>
+        <p style={{color:"#777",fontSize:SZ.xs,margin:"8px 0 0",lineHeight:1.4}}>Export saves all your workouts, progress, and settings. Share the JSON file to transfer data to another device.</p>
+      </div>
+
+      <button onClick={() => {if(confirm("Delete ALL data?")){localStorage.clear();location.reload()}}} style={{width:"100%",padding:"14px",borderRadius:14,border:"1px solid rgba(255,71,87,0.3)",background:"rgba(255,71,87,0.07)",color:"#ff4757",fontSize:SZ.md,fontWeight:600,cursor:"pointer"}}>🗑 Delete all data</button>
+      <p style={{color:"#555",fontSize:SZ.xs,textAlign:"center",marginTop:16}}>GymClimb v4.0 · Standalone · Garmin Fenix 7X</p>
+      <p style={{color:"#555",fontSize:SZ.xs,textAlign:"center",marginTop:4}}>Data stored locally on this device</p>
+    </div>
+  );
+
+  /* ═══ GARMIN ═══ */
+  const renderGarmin = () => (
+    <div style={{padding:"0 16px"}}>
+      <div style={{display:"flex",alignItems:"center",padding:"16px 0",paddingTop:"calc(16px + env(safe-area-inset-top, 0px))",gap:10}}>
+        <button onClick={() => setView("settings")} style={{width:40,height:40,borderRadius:12,border:"1px solid #222",background:"#111",color:"#888",fontSize:SZ.lg,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}>‹</button>
+        <h2 style={{color:"#fff",fontSize:SZ.xl,fontWeight:700,margin:0}}>⌚ Garmin Fenix 7X</h2>
+      </div>
+      <p style={{color:"#999",fontSize:SZ.cardSub,margin:"0 0 14px",lineHeight:1.5}}>Check your watch and enter these 4 numbers:</p>
+      <MorningForm onSave={svGarmin} week={week}/>
+      <p style={{color:"#999",fontSize:SZ.sm,letterSpacing:2,margin:"20px 0 10px"}}>HISTORY – W{week}</p>
+      {garmin.filter(g=>g.week===week).length===0?<p style={{color:"#555",fontSize:SZ.cardSub,textAlign:"center",padding:20}}>No entries this week</p>:
+        [...garmin.filter(g=>g.week===week)].reverse().map((g,i)=>(
+          <div key={i} style={{background:"#111118",borderRadius:13,padding:"13px 15px",marginBottom:7,border:"1px solid #1a1a25"}}>
+            <div style={{display:"flex",justifyContent:"space-between",marginBottom:6}}>
+              <span style={{color:"#748ffc",fontSize:SZ.sm,fontWeight:600}}>⌚ {new Date(g.date).toLocaleDateString("en",{weekday:"short",day:"numeric",month:"short"})}</span>
+              <span style={{color:rcol(Number(g.readiness)||0),fontSize:SZ.cardSub,fontWeight:700}}>{rlab(Number(g.readiness)||0)}</span>
+            </div>
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr 1fr",gap:6}}>
+              {[{l:"Ready",v:g.readiness,c:rcol(Number(g.readiness)||0)},{l:"Battery",v:g.battery,c:bcol(Number(g.battery)||0)},{l:"Sleep",v:g.sleep,c:scol(Number(g.sleep)||0)},{l:"Recov.",v:`${g.recovery||"–"}h`,c:"#748ffc"}].map(x=>(<div key={x.l} style={{background:"#0a0a14",borderRadius:7,padding:"6px",textAlign:"center"}}><p style={{color:"#777",fontSize:9,letterSpacing:1,margin:0}}>{x.l}</p><p style={{color:x.c,fontSize:SZ.md,fontWeight:700,margin:"2px 0 0",fontFamily:Mo}}>{x.v||"–"}</p></div>))}
+            </div>
+          </div>
+        ))
+      }
+    </div>
+  );
+
+  /* ═══ PROGRESS ═══ */
+  const renderProgress = () => (
+    <div style={{padding:"0 16px"}}>
+      <div style={{display:"flex",alignItems:"center",padding:"16px 0",paddingTop:"calc(16px + env(safe-area-inset-top, 0px))",gap:10}}>
+        <button onClick={() => setView("settings")} style={{width:40,height:40,borderRadius:12,border:"1px solid #222",background:"#111",color:"#888",fontSize:SZ.lg,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}>‹</button>
+        <h2 style={{color:"#fff",fontSize:SZ.xl,fontWeight:700,margin:0}}>⚖️ Weekly Progress</h2>
+      </div>
+      <button onClick={() => setShowPF(!showPF)} style={{width:"100%",padding:"13px",borderRadius:13,border:"1px dashed #00d2ff",background:showPF?"rgba(0,210,255,0.07)":"none",color:"#00d2ff",fontSize:SZ.cardSub,fontWeight:600,cursor:"pointer",marginBottom:14}}>{showPF?"Close":`+ Add for W${week}`}</button>
+      {showPF&&<ProgForm onSave={e=>{svProg(e);setShowPF(false)}} week={week}/>}
+      {[...prog].reverse().map((p,i) => {
+        const bmi = height && p.bodyWeight ? (Number(p.bodyWeight) / Math.pow(Number(height)/100, 2)).toFixed(1) : null;
+        const bmiCol = bmi ? (bmi < 18.5 ? "#339af0" : bmi < 25 ? "#51cf66" : bmi < 30 ? "#ffd43b" : "#ff4757") : "#999";
+        return (
+          <div key={i} style={{background:"#111118",borderRadius:13,padding:"13px 15px",marginBottom:7,border:"1px solid #1a1a25"}}>
+            <div style={{display:"flex",justifyContent:"space-between",marginBottom:6}}>
+              <span style={{color:"#00d2ff",fontSize:SZ.sm,fontWeight:600}}>Week {p.week || p.wk}</span>
+              <div style={{display:"flex",gap:10,alignItems:"baseline"}}>
+                {bmi && <span style={{color:bmiCol,fontSize:SZ.sm,fontFamily:Mo}}>BMI {bmi}</span>}
+                <span style={{color:"#ffd43b",fontSize:SZ.md,fontWeight:700,fontFamily:Mo}}>{p.bodyWeight} kg</span>
+              </div>
+            </div>
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:6}}>
+              {[{l:"Bench",v:p.bench,c:"#ff6b6b"},{l:"Squat",v:p.squat,c:"#cc5de8"},{l:"Deadlift",v:p.deadlift,c:"#51cf66"}].map(x=>(<div key={x.l} style={{background:"#0a0a14",borderRadius:8,padding:"8px",textAlign:"center"}}><p style={{color:"#999",fontSize:SZ.xs,letterSpacing:1,margin:0}}>{x.l}</p><p style={{color:x.c,fontSize:SZ.lg,fontWeight:700,margin:"2px 0 0",fontFamily:Mo}}>{x.v||"--"}</p></div>))}
+            </div>
+            {(p.waist||p.chest||p.arms||p.bodyFat) && (
+              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr 1fr",gap:5,marginTop:6}}>
+                {[{l:"Waist",v:p.waist,u:"cm"},{l:"Chest",v:p.chest,u:"cm"},{l:"Arms",v:p.arms,u:"cm"},{l:"BF%",v:p.bodyFat,u:"%"}].filter(x=>x.v).map(x=>(<div key={x.l} style={{background:"#0a0a14",borderRadius:6,padding:"5px",textAlign:"center"}}><p style={{color:"#777",fontSize:9,margin:0}}>{x.l}</p><p style={{color:"#20c997",fontSize:SZ.sm,fontWeight:600,margin:"1px 0 0",fontFamily:Mo}}>{x.v}{x.u}</p></div>))}
+              </div>
+            )}
+            {p.note && <p style={{color:"#777",fontSize:SZ.xs,margin:"6px 0 0",fontStyle:"italic"}}>{p.note}</p>}
+          </div>
+        );
+      })}
+    </div>
+  );
+
+  /* ═══ RENDER ═══ */
+  return (
+    <div style={{minHeight:"100dvh",background:"#0a0a14",fontFamily:Fn,maxWidth:480,margin:"0 auto",position:"relative",WebkitOverflowScrolling:"touch",overscrollBehavior:"none"}}>
+      <div className="safe-bottom">
+        {view==="home"&&renderHome()}{view==="day"&&renderDay()}{view==="outdoor"&&renderOutdoor()}
+        {view==="dashboard"&&renderDash()}{view==="settings"&&renderSettings()}{view==="garmin"&&renderGarmin()}{view==="progress"&&renderProgress()}
+      </div>
+      {showTimer&&<RestTimer onClose={() => setShowTimer(false)}/>}
+
+      {/* Bottom Nav */}
+      {(() => {
+        const dis = dismissed[`${week}`] || [];
+        let pending = 0;
+        if (garmin.filter(g=>g.week===week).length===0 && !dis.includes("garmin")) pending++;
+        if (!prog.find(p=>p.week===week) && !dis.includes("progress")) pending++;
+        const inc = program.filter((d,i) => d.type==="workout"&&dayProg(i)!==null&&dayProg(i)<100).length;
+        if (inc>0 && !dis.includes("workouts")) pending++;
+        if (climb.filter(c=>c.week===week).length===0 && !dis.includes("climb")) pending++;
+        if (hikes.filter(h=>h.week===week).length===0 && !dis.includes("hike")) pending++;
+        return (
+          <div className="nav-safe" style={{position:"fixed",bottom:0,left:"50%",transform:"translateX(-50%)",width:"100%",maxWidth:480,background:"rgba(10,10,20,0.97)",borderTop:"1px solid #1a1a25",paddingTop:8,display:"flex",justifyContent:"space-around",backdropFilter:"blur(20px)",WebkitBackdropFilter:"blur(20px)",zIndex:100}}>
+            {[{id:"home",i:"🏠",l:"Program",badge:pending},{id:"outdoor",i:"🏔️",l:"Outdoor"},{id:"dashboard",i:"📊",l:"Stats"},{id:"settings",i:"⚙️",l:"Settings"}].map(t=>(
+              <button key={t.id} onClick={() => setView(t.id)} style={{background:"none",border:"none",cursor:"pointer",display:"flex",flexDirection:"column",alignItems:"center",gap:2,padding:"6px 16px",position:"relative",minHeight:50,minWidth:50,WebkitTapHighlightColor:"transparent"}}>
+                <span style={{fontSize:SZ.navIcon}}>{t.i}</span>
+                <span style={{fontSize:SZ.navLabel,letterSpacing:0.5,color:view===t.id?"#00d2ff":"#888",fontWeight:view===t.id?700:400}}>{t.l}</span>
+                {t.badge>0&&<div style={{position:"absolute",top:-2,right:4,width:20,height:20,borderRadius:10,background:"#ff4757",display:"flex",alignItems:"center",justifyContent:"center"}}><span style={{color:"#fff",fontSize:11,fontWeight:700}}>{t.badge}</span></div>}
+              </button>
+            ))}
+          </div>
+        );
+      })()}
+    </div>
+  );
+}
+
+/* ═══════════ SUB COMPONENTS ═══════════ */
+
+function CC({t,c,children}) {
+  return (<div style={{background:"#111118",borderRadius:14,padding:"14px 10px 10px 0",border:"1px solid #1a1a25",marginBottom:10}}><p style={{color:c||"#aaa",fontSize:SZ.sm,letterSpacing:2,margin:"0 0 8px 14px",fontWeight:600}}>{t}</p>{children}</div>);
+}
+
+function GarminCard({gm,isLow,onAdd}) {
+  if (!gm) return (<button onClick={onAdd} style={{width:"100%",background:"linear-gradient(135deg,#0f1520,#152035)",borderRadius:16,padding:"18px 20px",marginBottom:12,border:"1px dashed rgba(116,143,252,0.3)",cursor:"pointer",textAlign:"left"}}><div style={{display:"flex",alignItems:"center",justifyContent:"space-between"}}><div><p style={{color:"#748ffc",fontSize:SZ.sm,letterSpacing:2,margin:0,fontWeight:600}}>⌚ GARMIN FENIX 7X</p><p style={{color:"#999",fontSize:SZ.cardSub,margin:"4px 0 0"}}>Add morning check-in →</p></div><span style={{fontSize:36}}>⌚</span></div></button>);
+  const r=Number(gm.readiness)||0,b=Number(gm.battery)||0,sl=Number(gm.sleep)||0;
+  return (<button onClick={onAdd} style={{width:"100%",background:isLow?"linear-gradient(135deg,#1a0a0a,#200a0a)":"linear-gradient(135deg,#0a1a10,#0a2015)",borderRadius:16,padding:"16px 18px",marginBottom:12,border:isLow?"1px solid rgba(255,71,87,0.2)":"1px solid rgba(81,207,102,0.15)",cursor:"pointer",textAlign:"left"}}>
+    <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}><p style={{color:"#748ffc",fontSize:SZ.sm,letterSpacing:2,margin:0,fontWeight:600}}>⌚ GARMIN STATUS</p><span style={{color:rcol(r),fontSize:SZ.md,fontWeight:700}}>{rlab(r)}</span></div>
+    <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr 1fr",gap:7}}>
+      {[{l:"Readiness",v:r,c:rcol(r),mx:100},{l:"Battery",v:b,c:bcol(b),mx:100},{l:"Sleep",v:sl,c:scol(sl),mx:100},{l:"Recovery",v:gm.recovery||"–",c:"#748ffc",mx:null}].map(x=>(<div key={x.l} style={{textAlign:"center"}}><p style={{color:"#777",fontSize:9,letterSpacing:1,margin:0}}>{x.l}</p><p style={{color:x.c,fontSize:SZ.lg,fontWeight:700,margin:"3px 0 0",fontFamily:Mo}}>{x.v}</p>{x.mx&&<div style={{height:3,background:"#1a1a25",borderRadius:2,marginTop:3,overflow:"hidden"}}><div style={{width:`${(Number(x.v)||0)/x.mx*100}%`,height:"100%",background:x.c,borderRadius:2}}/></div>}</div>))}
+    </div>
+  </button>);
+}
+
+function MorningForm({onSave,week}) {
+  const [f,setF] = useState({readiness:"",battery:"",sleep:"",recovery:""});
+  return (<div style={{background:"#111118",borderRadius:14,padding:"18px",border:"1px solid #1a1a25",marginBottom:14}}>
+    <p style={{color:"#748ffc",fontSize:SZ.sm,letterSpacing:2,margin:"0 0 12px",fontWeight:600}}>MORNING CHECK-IN</p>
+    <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
+      {[{k:"readiness",l:"🎯 Training Readiness"},{k:"battery",l:"🔋 Body Battery"},{k:"sleep",l:"😴 Sleep Score"},{k:"recovery",l:"⏳ Recovery (hrs)"}].map(x=>(<div key={x.k}><label style={{color:"#999",fontSize:SZ.xs}}>{x.l}</label><input type="number" inputMode="numeric" placeholder="0–100" value={f[x.k]} onChange={e=>setF({...f,[x.k]:e.target.value})} style={{width:"100%",padding:"10px",borderRadius:10,border:"1px solid #222",background:"#0a0a14",color:"#fff",fontSize:SZ.input,fontFamily:Mo,outline:"none",boxSizing:"border-box",marginTop:4}}/></div>))}
+    </div>
+    <button onClick={() => {if(f.readiness||f.battery){onSave(f);setF({readiness:"",battery:"",sleep:"",recovery:""})}}} style={{width:"100%",padding:"13px",borderRadius:12,border:"none",background:"#748ffc",color:"#000",fontSize:SZ.btn,fontWeight:700,cursor:"pointer",marginTop:14}}>Save ⌚</button>
+  </div>);
+}
+
+function PostWOCard({pwo,onSave}) {
+  const [show,setShow] = useState(false);
+  const [f,setF] = useState({avgHR:"",maxHR:"",calories:"",teAerobic:"",teAnaerobic:"",load:""});
+  if (pwo&&!show) return (<div style={{background:"#111118",borderRadius:14,padding:"14px 16px",marginTop:8,border:"1px solid #1a1a25"}}><p style={{color:"#748ffc",fontSize:SZ.sm,letterSpacing:2,margin:"0 0 8px",fontWeight:600}}>⌚ POST-WORKOUT</p><div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:6}}>{[{l:"❤️ HR",v:pwo.avgHR?`${pwo.avgHR}/${pwo.maxHR||"–"}`:null,c:"#ff6b6b"},{l:"🔥 kcal",v:pwo.calories,c:"#ffa94d"},{l:"⚡ Load",v:pwo.load,c:"#ffd43b"}].filter(x=>x.v).map(x=>(<div key={x.l} style={{background:"#0a0a14",borderRadius:7,padding:"6px",textAlign:"center"}}><p style={{color:"#777",fontSize:9,margin:0}}>{x.l}</p><p style={{color:x.c,fontSize:SZ.md,fontWeight:700,margin:"2px 0 0",fontFamily:Mo}}>{x.v}</p></div>))}</div></div>);
+  return (<div style={{marginTop:8}}><button onClick={() => setShow(!show)} style={{width:"100%",padding:"12px",borderRadius:13,border:"1px dashed rgba(116,143,252,0.4)",background:show?"rgba(116,143,252,0.05)":"none",color:"#748ffc",fontSize:SZ.cardSub,fontWeight:600,cursor:"pointer"}}>{show?"Cancel":"⌚ Add Garmin post-workout"}</button>
+    {show&&<div style={{background:"#111118",borderRadius:14,padding:"16px",border:"1px solid #1a1a25",marginTop:8}}>
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:7}}>
+        {[{k:"avgHR",l:"Avg HR",p:"bpm"},{k:"maxHR",l:"Max HR",p:"bpm"},{k:"calories",l:"Calories",p:"kcal"},{k:"teAerobic",l:"TE Aero",p:"0–5"},{k:"teAnaerobic",l:"TE Anaero",p:"0–5"},{k:"load",l:"Load",p:"EPOC"}].map(x=>(<div key={x.k}><label style={{color:"#999",fontSize:SZ.xs}}>{x.l}</label><input type="number" inputMode="decimal" placeholder={x.p} value={f[x.k]} onChange={e=>setF({...f,[x.k]:e.target.value})} style={{width:"100%",padding:"7px",borderRadius:8,border:"1px solid #222",background:"#0a0a14",color:"#fff",fontSize:SZ.md,fontFamily:Mo,outline:"none",boxSizing:"border-box",marginTop:3}}/></div>))}
+      </div>
+      <button onClick={() => {onSave(f);setShow(false)}} style={{width:"100%",padding:"12px",borderRadius:10,border:"none",background:"#748ffc",color:"#000",fontSize:SZ.md,fontWeight:700,cursor:"pointer",marginTop:10}}>Save ⌚</button>
+    </div>}
+  </div>);
+}
+
+function AddExForm({onSave,compact}) {
+  const [f,setF] = useState({name:"",sets:3,reps:"10",muscle:"chest"});
+  return (<div style={{background:compact?"#0a0a14":"#111118",borderRadius:12,padding:compact?"12px":"16px",border:"1px solid #1a1a25",marginBottom:8,marginTop:compact?6:0}}>
+    <input type="text" placeholder="Exercise name" value={f.name} onChange={e=>setF({...f,name:e.target.value})} style={{width:"100%",padding:"9px 10px",borderRadius:9,border:"1px solid #222",background:"#0a0a14",color:"#fff",fontSize:SZ.md,outline:"none",boxSizing:"border-box",marginBottom:8}}/>
+    <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:7}}>
+      <div><label style={{color:"#999",fontSize:SZ.xs}}>Sets</label><input type="number" inputMode="numeric" value={f.sets} onChange={e=>setF({...f,sets:Number(e.target.value)})} style={{width:"100%",padding:"7px",borderRadius:8,border:"1px solid #222",background:"#0a0a14",color:"#fff",fontSize:SZ.md,fontFamily:Mo,outline:"none",boxSizing:"border-box"}}/></div>
+      <div><label style={{color:"#999",fontSize:SZ.xs}}>Reps</label><input type="text" value={f.reps} onChange={e=>setF({...f,reps:e.target.value})} style={{width:"100%",padding:"7px",borderRadius:8,border:"1px solid #222",background:"#0a0a14",color:"#fff",fontSize:SZ.md,outline:"none",boxSizing:"border-box"}}/></div>
+      <div><label style={{color:"#999",fontSize:SZ.xs}}>Muscle</label><select value={f.muscle} onChange={e=>setF({...f,muscle:e.target.value})} style={{width:"100%",padding:"7px",borderRadius:8,border:"1px solid #222",background:"#0a0a14",color:"#fff",fontSize:SZ.sm,outline:"none"}}>{MUSCLES.map(m=><option key={m} value={m}>{m}</option>)}</select></div>
+    </div>
+    <button onClick={() => {if(f.name.trim()){onSave(f);setF({name:"",sets:3,reps:"10",muscle:"chest"})}}} style={{width:"100%",padding:"10px",borderRadius:10,border:"none",background:"#00d2ff",color:"#000",fontSize:SZ.cardSub,fontWeight:700,cursor:"pointer",marginTop:8}}>+ Add</button>
+  </div>);
+}
+
+function ProgForm({onSave,week}) {
+  const [f,setF] = useState({bodyWeight:"",bench:"",squat:"",deadlift:"",pullups:"",waist:"",chest:"",arms:"",bodyFat:"",note:""});
+  return (<div style={{background:"#111118",borderRadius:14,padding:"18px",border:"1px solid #1a1a25",marginBottom:14}}>
+    <p style={{color:"#00d2ff",fontSize:SZ.sm,fontWeight:600,margin:"0 0 10px"}}>Week {week}</p>
+    <p style={{color:"#999",fontSize:SZ.xs,letterSpacing:2,margin:"0 0 6px"}}>LIFTS & WEIGHT</p>
+    {[{k:"bodyWeight",l:"⚖️ Body weight (kg)"},{k:"bench",l:"🏋️ Bench (kg)"},{k:"squat",l:"🦵 Squat (kg)"},{k:"deadlift",l:"💀 Deadlift (kg)"},{k:"pullups",l:"💪 Pull-ups (max)"}].map(x=>(<div key={x.k} style={{marginBottom:9}}><label style={{color:"#999",fontSize:SZ.xs}}>{x.l}</label><input type="number" inputMode="decimal" value={f[x.k]} onChange={e=>setF({...f,[x.k]:e.target.value})} style={{width:"100%",padding:"9px 10px",borderRadius:9,border:"1px solid #222",background:"#0a0a14",color:"#fff",fontSize:SZ.input,fontFamily:Mo,outline:"none",marginTop:3,boxSizing:"border-box"}}/></div>))}
+    <p style={{color:"#999",fontSize:SZ.xs,letterSpacing:2,margin:"14px 0 6px"}}>📏 BODY MEASUREMENTS</p>
+    <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
+      {[{k:"waist",l:"Waist (cm)"},{k:"chest",l:"Chest (cm)"},{k:"arms",l:"Arms (cm)"},{k:"bodyFat",l:"Body fat (%)"}].map(x=>(<div key={x.k}><label style={{color:"#999",fontSize:SZ.xs}}>{x.l}</label><input type="number" inputMode="decimal" placeholder="--" value={f[x.k]} onChange={e=>setF({...f,[x.k]:e.target.value})} style={{width:"100%",padding:"8px 10px",borderRadius:9,border:"1px solid #222",background:"#0a0a14",color:"#fff",fontSize:SZ.input,fontFamily:Mo,outline:"none",marginTop:3,boxSizing:"border-box"}}/></div>))}
+    </div>
+    <input type="text" placeholder="Notes..." value={f.note} onChange={e=>setF({...f,note:e.target.value})} style={{width:"100%",padding:"8px 10px",borderRadius:8,border:"1px solid #222",background:"#0a0a14",color:"#999",fontSize:SZ.sm,outline:"none",boxSizing:"border-box",marginTop:10}}/>
+    <button onClick={() => onSave(f)} style={{width:"100%",padding:"13px",borderRadius:11,border:"none",background:"#00d2ff",color:"#000",fontSize:SZ.btn,fontWeight:700,cursor:"pointer",marginTop:10}}>Save progress</button>
+  </div>);
+}
+
+function ClimbLog({climb,week,onSave}) {
+  const [show,setShow] = useState(false);
+  const [f,setF] = useState({style:"bouldering",grade:"V3",attempts:1,status:"redpoint",duration:60});
+  const gr=f.style==="bouldering"?BG:SG; const wk=climb.filter(c=>c.week===week&&c.type!=="session");
+  return (<div>
+    <button onClick={() => setShow(!show)} style={{width:"100%",padding:"12px",borderRadius:13,border:"1px dashed #51cf66",background:show?"rgba(81,207,102,0.07)":"none",color:"#51cf66",fontSize:SZ.cardSub,fontWeight:600,cursor:"pointer",marginBottom:12}}>{show?"Cancel":"+ New route"}</button>
+    {show&&<div style={{background:"#111118",borderRadius:14,padding:"16px",border:"1px solid #1a1a25",marginBottom:12}}>
+      <div style={{display:"flex",gap:6,marginBottom:10}}>{["bouldering","sport"].map(s=>(<button key={s} onClick={() => setF({...f,style:s,grade:s==="bouldering"?"V3":"6a"})} style={{flex:1,padding:"9px",borderRadius:10,border:"none",background:f.style===s?"#51cf66":"#1a1a25",color:f.style===s?"#000":"#999",fontWeight:600,fontSize:SZ.sm,cursor:"pointer"}}>{s==="bouldering"?"🪨 Boulder":"🧗 Sport"}</button>))}</div>
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:8}}>
+        <div><label style={{color:"#999",fontSize:SZ.xs}}>GRADE</label><select value={f.grade} onChange={e=>setF({...f,grade:e.target.value})} style={{width:"100%",padding:"9px",borderRadius:9,border:"1px solid #222",background:"#0a0a14",color:"#fff",fontSize:SZ.md,fontFamily:Mo,outline:"none"}}>{gr.map(g=><option key={g} value={g}>{g}</option>)}</select></div>
+        <div><label style={{color:"#999",fontSize:SZ.xs}}>STATUS</label><select value={f.status} onChange={e=>setF({...f,status:e.target.value})} style={{width:"100%",padding:"9px",borderRadius:9,border:"1px solid #222",background:"#0a0a14",color:"#fff",fontSize:SZ.cardSub,outline:"none"}}>{[["flash","⚡ Flash"],["redpoint","🔴 Redpoint"],["project","🔧 Project"]].map(([v,l])=><option key={v} value={v}>{l}</option>)}</select></div>
+      </div>
+      <button onClick={() => {onSave({...f,type:"route"});setShow(false)}} style={{width:"100%",padding:"12px",borderRadius:11,border:"none",background:"#51cf66",color:"#000",fontSize:SZ.md,fontWeight:700,cursor:"pointer"}}>Save route</button>
+    </div>}
+    {wk.length===0?<p style={{color:"#555",fontSize:SZ.cardSub,textAlign:"center",padding:20}}>No routes for W{week}</p>:wk.map((r,i)=>(<div key={i} style={{background:"#111118",borderRadius:12,padding:"12px 14px",marginBottom:6,border:"1px solid #1a1a25",display:"flex",alignItems:"center",gap:10}}><span style={{fontSize:SZ.icon}}>{r.style==="bouldering"?"🪨":"🧗"}</span><div style={{flex:1}}><p style={{color:"#eee",fontSize:SZ.md,fontWeight:600,margin:0}}>{r.grade}</p><p style={{color:"#999",fontSize:SZ.sm,margin:"2px 0 0"}}>{r.status==="flash"?"⚡ Flash":r.status==="redpoint"?"🔴 Redpoint":"🔧 Project"}</p></div></div>))}
+  </div>);
+}
+
+function HikeLog({hikes,week,onSave}) {
+  const [show,setShow] = useState(false);
+  const [f,setF] = useState({trail:"",distance:"",elevation:"",duration:"",difficulty:"Moderate",note:""});
+  const wk=hikes.filter(h=>h.week===week);
+  return (<div>
+    <button onClick={() => setShow(!show)} style={{width:"100%",padding:"12px",borderRadius:13,border:"1px dashed #20c997",background:show?"rgba(32,201,151,0.07)":"none",color:"#20c997",fontSize:SZ.cardSub,fontWeight:600,cursor:"pointer",marginBottom:12}}>{show?"Cancel":"+ New hike"}</button>
+    {show&&<div style={{background:"#111118",borderRadius:14,padding:"16px",border:"1px solid #1a1a25",marginBottom:12}}>
+      <input type="text" placeholder="Trail name" value={f.trail} onChange={e=>setF({...f,trail:e.target.value})} style={{width:"100%",padding:"10px",borderRadius:10,border:"1px solid #222",background:"#0a0a14",color:"#fff",fontSize:SZ.md,outline:"none",boxSizing:"border-box",marginBottom:8}}/>
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:7,marginBottom:8}}>
+        {[{k:"distance",l:"Distance (km)"},{k:"elevation",l:"Elevation (m)"},{k:"duration",l:"Duration (min)"}].map(x=>(<div key={x.k}><label style={{color:"#999",fontSize:SZ.xs}}>{x.l}</label><input type="number" inputMode="decimal" value={f[x.k]} onChange={e=>setF({...f,[x.k]:e.target.value})} style={{width:"100%",padding:"8px",borderRadius:8,border:"1px solid #222",background:"#0a0a14",color:"#fff",fontSize:SZ.md,fontFamily:Mo,outline:"none",boxSizing:"border-box"}}/></div>))}
+      </div>
+      <div style={{marginBottom:8}}><label style={{color:"#999",fontSize:SZ.xs}}>Difficulty</label><div style={{display:"flex",gap:5,marginTop:4}}>{DIFF.map(d=>(<button key={d} onClick={() => setF({...f,difficulty:d})} style={{flex:1,padding:"8px",borderRadius:8,border:"none",background:f.difficulty===d?"#20c997":"#1a1a25",color:f.difficulty===d?"#000":"#999",fontSize:SZ.xs,fontWeight:600,cursor:"pointer"}}>{d}</button>))}</div></div>
+      <button onClick={() => {if(f.trail.trim()){onSave(f);setShow(false);setF({trail:"",distance:"",elevation:"",duration:"",difficulty:"Moderate",note:""})}}} style={{width:"100%",padding:"12px",borderRadius:11,border:"none",background:"#20c997",color:"#000",fontSize:SZ.md,fontWeight:700,cursor:"pointer"}}>Save hike</button>
+    </div>}
+    {wk.length===0?<p style={{color:"#555",fontSize:SZ.cardSub,textAlign:"center",padding:20}}>No hikes for W{week}</p>:wk.map((h,i)=>(<div key={i} style={{background:"#111118",borderRadius:13,padding:"14px 16px",marginBottom:7,border:"1px solid #1a1a25"}}>
+      <div style={{display:"flex",alignItems:"center",gap:10}}><span style={{fontSize:SZ.icon}}>🥾</span><div style={{flex:1}}><p style={{color:"#eee",fontSize:SZ.md,fontWeight:600,margin:0}}>{h.trail||"Unnamed"}</p><p style={{color:"#999",fontSize:SZ.sm,margin:"3px 0 0"}}>{h.distance&&`${h.distance}km`}{h.elevation&&` · ↑${h.elevation}m`}{h.duration&&` · ${h.duration}min`}</p></div><span style={{color:h.difficulty==="Expert"?"#ff4757":h.difficulty==="Hard"?"#ffa94d":h.difficulty==="Moderate"?"#ffd43b":"#51cf66",fontSize:SZ.xs,fontWeight:600,padding:"3px 8px",borderRadius:6,background:"rgba(255,255,255,0.05)"}}>{h.difficulty}</span></div>
+      {h.note&&<p style={{color:"#777",fontSize:SZ.sm,margin:"6px 0 0",fontStyle:"italic"}}>{h.note}</p>}
+    </div>))}
+  </div>);
+}
+
+function FingerLog({finger,week,onSave}) {
+  const [show,setShow] = useState(false);
+  const [f,setF] = useState({grip:"Half crimp",weight:0,hangTime:10,edgeSize:20});
+  const wk=finger.filter(x=>x.week===week);
+  return (<div>
+    <button onClick={() => setShow(!show)} style={{width:"100%",padding:"12px",borderRadius:13,border:"1px dashed #ffa94d",background:show?"rgba(255,169,77,0.07)":"none",color:"#ffa94d",fontSize:SZ.cardSub,fontWeight:600,cursor:"pointer",marginBottom:12}}>{show?"Cancel":"+ Hangboard"}</button>
+    {show&&<div style={{background:"#111118",borderRadius:14,padding:"16px",border:"1px solid #1a1a25",marginBottom:12}}>
+      <div style={{marginBottom:8}}><label style={{color:"#999",fontSize:SZ.xs}}>GRIP</label><select value={f.grip} onChange={e=>setF({...f,grip:e.target.value})} style={{width:"100%",padding:"9px",borderRadius:9,border:"1px solid #222",background:"#0a0a14",color:"#fff",fontSize:SZ.cardSub,outline:"none"}}>{GRIPS.map(g=><option key={g} value={g}>{g}</option>)}</select></div>
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:7,marginBottom:8}}>{[{k:"weight",l:"+KG"},{k:"hangTime",l:"Hang (s)"},{k:"edgeSize",l:"Edge (mm)"}].map(x=>(<div key={x.k}><label style={{color:"#999",fontSize:SZ.xs}}>{x.l}</label><input type="number" inputMode="decimal" value={f[x.k]} onChange={e=>setF({...f,[x.k]:e.target.value})} style={{width:"100%",padding:"8px",borderRadius:8,border:"1px solid #222",background:"#0a0a14",color:"#fff",fontSize:SZ.md,fontFamily:Mo,outline:"none",boxSizing:"border-box"}}/></div>))}</div>
+      <button onClick={() => {onSave(f);setShow(false)}} style={{width:"100%",padding:"12px",borderRadius:11,border:"none",background:"#ffa94d",color:"#000",fontSize:SZ.md,fontWeight:700,cursor:"pointer"}}>Save</button>
+    </div>}
+    {wk.length===0?<p style={{color:"#555",fontSize:SZ.cardSub,textAlign:"center",padding:20}}>No data for W{week}</p>:wk.map((x,i)=>(<div key={i} style={{background:"#111118",borderRadius:12,padding:"12px 14px",marginBottom:6,border:"1px solid #1a1a25",display:"flex",justifyContent:"space-between",alignItems:"center"}}><div><p style={{color:"#eee",fontSize:SZ.cardSub,fontWeight:600,margin:0}}>🤏 {x.grip}</p><p style={{color:"#999",fontSize:SZ.sm,margin:"2px 0 0"}}>{x.hangTime}s · {x.edgeSize}mm</p></div><span style={{color:"#ffa94d",fontSize:SZ.md,fontWeight:700,fontFamily:Mo}}>+{x.weight}kg</span></div>))}
+  </div>);
+}
+
+/* ═══ MOUNT ═══ */
+const root = ReactDOM.createRoot(document.getElementById("root"));
+root.render(<App />);
+</script>
+</body>
+</html>
