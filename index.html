@@ -1,0 +1,1911 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="GymClimb">
+<meta name="theme-color" content="#0a0a14">
+<meta name="mobile-web-app-capable" content="yes">
+<link rel="manifest" href="data:application/json,%7B%22name%22%3A%22GymClimb%20Tracker%22%2C%22short_name%22%3A%22GymClimb%22%2C%22start_url%22%3A%22.%22%2C%22display%22%3A%22standalone%22%2C%22background_color%22%3A%22%230a0a14%22%2C%22theme_color%22%3A%22%230a0a14%22%7D">
+<title>GymClimb Tracker</title>
+<link rel="apple-touch-icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect fill='%230a0a14' width='100' height='100' rx='20'/><text y='68' x='50' text-anchor='middle' font-size='55'>🏔️</text></svg>">
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+<style>
+  * { -webkit-tap-highlight-color: transparent; box-sizing: border-box; margin: 0; padding: 0; }
+  html, body, #root { height: 100%; overscroll-behavior: none; -webkit-text-size-adjust: 100%; background: #0a0a14; }
+  body { font-family: 'DM Sans', sans-serif; }
+  input, select, textarea { font-size: 16px !important; border: none; }
+  ::-webkit-scrollbar { display: none; }
+  @supports (padding-bottom: env(safe-area-inset-bottom)) {
+    .safe-bottom { padding-bottom: calc(100px + env(safe-area-inset-bottom, 20px)) !important; }
+    .nav-safe { padding-bottom: calc(12px + env(safe-area-inset-bottom, 8px)) !important; }
+    .st { padding-top: env(safe-area-inset-top, 0px) !important; }
+  }
+  @keyframes fadeUp { from { opacity:0; transform:translateY(16px); } to { opacity:1; transform:translateY(0); } }
+  @keyframes fadeIn { from { opacity:0; } to { opacity:1; } }
+  @keyframes barGrow { from { transform:scaleY(0); } to { transform:scaleY(1); } }
+  @keyframes pulse { 0%,100% { opacity:1; } 50% { opacity:0.6; } }
+  @keyframes float { 0%,100% { transform:translateY(0); } 50% { transform:translateY(-4px); } }
+  @keyframes spin { from { transform:rotate(0deg); } to { transform:rotate(360deg); } }
+  @keyframes slideIn { from { opacity:0; transform:translateX(-10px); } to { opacity:1; transform:translateX(0); } }
+  .anim-up { animation: fadeUp 0.4s ease-out both; }
+  .anim-in { animation: fadeIn 0.3s ease-out both; }
+  .anim-bar { animation: barGrow 0.6s ease-out both; transform-origin: bottom; }
+  .anim-slide { animation: slideIn 0.3s ease-out both; }
+  .anim-float { animation: float 3s ease-in-out infinite; }
+  .anim-pulse { animation: pulse 2s ease-in-out infinite; }
+  .wx-sun { animation: spin 20s linear infinite; color: #ffd43b; }
+  .wx-cloud { animation: float 4s ease-in-out infinite; }
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script crossorigin src="https://cdnjs.cloudflare.com/ajax/libs/react/18.3.1/umd/react.production.min.js"></script>
+<script crossorigin src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.3.1/umd/react-dom.production.min.js"></script>
+<script crossorigin src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.26.4/babel.min.js"></script>
+<script type="text/babel">
+const { useState, useEffect, useCallback, useRef } = React;
+
+/* ═══ i18n ═══ */
+const TR = {
+  // Nav
+  nav_program:{en:"Program",hr:"Program",de:"Programm"},nav_outdoor:{en:"Outdoor",hr:"Outdoor",de:"Outdoor"},nav_analytics:{en:"Analytics",hr:"Analitika",de:"Analytik"},nav_settings:{en:"Settings",hr:"Postavke",de:"Einstellungen"},
+  // Home
+  week:{en:"Week",hr:"Tjedan",de:"Woche"},hey:{en:"Hey",hr:"Hej",de:"Hey"},
+  // Reminders
+  rem_watch:{en:"Add watch morning check-in",hr:"Dodaj jutarnji unos sa sata",de:"Uhr-Morgen-Check-in hinzufügen"},rem_prog:{en:"Enter weekly body progress",hr:"Unesi tjedni napredak tijela",de:"Wöchentlichen Körperfortschritt eingeben"},rem_work:{en:"workout days not completed",hr:"trenažnih dana nije završeno",de:"Trainingstage nicht abgeschlossen"},rem_climb:{en:"No climbing logged this week",hr:"Nema penjanja ovaj tjedan",de:"Kein Klettern diese Woche"},rem_hike:{en:"No hikes logged this week",hr:"Nema planinarenja ovaj tjedan",de:"Keine Wanderungen diese Woche"},reminders:{en:"REMINDERS",hr:"PODSJETNICI",de:"ERINNERUNGEN"},
+  // Timer
+  tim_rest:{en:"Rest between sets",hr:"Odmor između serija",de:"Pause zwischen Sätzen"},tim_start:{en:"Start",hr:"Start",de:"Start"},tim_pause:{en:"Pause",hr:"Pauza",de:"Pause"},tim_reset:{en:"Reset",hr:"Reset",de:"Zurücksetzen"},tim_done:{en:"Done!",hr:"Gotovo!",de:"Fertig!"},
+  // Day
+  complete_all:{en:"✓ Complete all exercises",hr:"✓ Završi sve vježbe",de:"✓ Alle Übungen abschließen"},mark_done:{en:"Mark as done",hr:"Označi kao gotovo",de:"Als erledigt markieren"},completed:{en:"✓ Completed",hr:"✓ Završeno",de:"✓ Abgeschlossen"},add_ex:{en:"+ Add exercise",hr:"+ Dodaj vježbu",de:"+ Übung hinzufügen"},add_btn:{en:"+ Add",hr:"+ Dodaj",de:"+ Hinzufügen"},notes:{en:"Notes...",hr:"Bilješke...",de:"Notizen..."},sets:{en:"Sets",hr:"Serije",de:"Sätze"},reps:{en:"Reps",hr:"Pon.",de:"Wdh."},muscle:{en:"Muscle",hr:"Mišić",de:"Muskel"},ex_name:{en:"Exercise name",hr:"Naziv vježbe",de:"Übungsname"},
+  // Outdoor
+  outdoor:{en:"Outdoor",hr:"Outdoor",de:"Outdoor"},climb:{en:"Climb",hr:"Penjanje",de:"Klettern"},hike:{en:"Hike",hr:"Planinarenje",de:"Wandern"},fingers:{en:"Fingers",hr:"Prsti",de:"Finger"},pyramid:{en:"Pyramid",hr:"Piramida",de:"Pyramide"},
+  new_route:{en:"+ New route",hr:"+ Nova ruta",de:"+ Neue Route"},cancel:{en:"Cancel",hr:"Odustani",de:"Abbrechen"},save_route:{en:"Save route",hr:"Spremi rutu",de:"Route speichern"},boulder:{en:"🪨 Boulder",hr:"🪨 Boulder",de:"🪨 Boulder"},sport:{en:"🧗 Sport",hr:"🧗 Sport",de:"🧗 Sport"},grade:{en:"GRADE",hr:"OCJENA",de:"GRAD"},status:{en:"STATUS",hr:"STATUS",de:"STATUS"},attempts:{en:"ATTEMPTS",hr:"POKUŠAJI",de:"VERSUCHE"},hours:{en:"HOURS",hr:"SATI",de:"STUNDEN"},minutes:{en:"MINUTES",hr:"MINUTE",de:"MINUTEN"},location:{en:"📍 Location (gym, crag name...)",hr:"📍 Lokacija (dvorana, stijena...)",de:"📍 Ort (Halle, Felsen...)"},conditions:{en:"🌤️ Conditions",hr:"🌤️ Uvjeti",de:"🌤️ Bedingungen"},no_routes:{en:"No routes for",hr:"Nema ruta za",de:"Keine Routen für"},
+  new_hike:{en:"+ New hike",hr:"+ Novo planinarenje",de:"+ Neue Wanderung"},save_hike:{en:"Save hike",hr:"Spremi planinarenje",de:"Wanderung speichern"},trail:{en:"Trail name",hr:"Naziv staze",de:"Wegname"},distance:{en:"Distance (km)",hr:"Udaljenost (km)",de:"Entfernung (km)"},elevation:{en:"Elevation (m)",hr:"Visinska razlika (m)",de:"Höhenmeter (m)"},duration:{en:"Duration (min)",hr:"Trajanje (min)",de:"Dauer (min)"},difficulty:{en:"Difficulty",hr:"Težina",de:"Schwierigkeit"},weather_lbl:{en:"🌤️ Weather",hr:"🌤️ Vrijeme",de:"🌤️ Wetter"},temp_lbl:{en:"🌡️ Temp (°C)",hr:"🌡️ Temp (°C)",de:"🌡️ Temp (°C)"},no_hikes:{en:"No hikes for",hr:"Nema planinarenja za",de:"Keine Wanderungen für"},hangboard:{en:"+ Hangboard",hr:"+ Hangboard",de:"+ Hangboard"},
+  del_route:{en:"Delete this route?",hr:"Obrisati ovu rutu?",de:"Diese Route löschen?"},del_hike:{en:"Delete this hike?",hr:"Obrisati ovo planinarenje?",de:"Diese Wanderung löschen?"},
+  // Run & Yoga
+  run:{en:"Run",hr:"Trčanje",de:"Laufen"},yoga:{en:"Yoga",hr:"Yoga",de:"Yoga"},
+  new_run:{en:"+ New run",hr:"+ Novo trčanje",de:"+ Neuer Lauf"},save_run:{en:"Save run",hr:"Spremi trčanje",de:"Lauf speichern"},no_runs:{en:"No runs for",hr:"Nema trčanja za",de:"Keine Läufe für"},del_run:{en:"Delete this run?",hr:"Obrisati ovo trčanje?",de:"Diesen Lauf löschen?"},
+  run_route:{en:"Route name",hr:"Naziv rute",de:"Routenname"},run_dist:{en:"Distance (km)",hr:"Udaljenost (km)",de:"Distanz (km)"},run_dur:{en:"Duration (min)",hr:"Trajanje (min)",de:"Dauer (min)"},run_pace:{en:"Pace",hr:"Tempo",de:"Tempo"},run_hr:{en:"Avg HR",hr:"Prosj. puls",de:"Ø HF"},run_feel:{en:"Feel",hr:"Osjećaj",de:"Gefühl"},
+  new_yoga:{en:"+ New session",hr:"+ Nova sesija",de:"+ Neue Sitzung"},save_yoga:{en:"Save session",hr:"Spremi sesiju",de:"Sitzung speichern"},no_yoga:{en:"No yoga for",hr:"Nema yoge za",de:"Kein Yoga für"},del_yoga:{en:"Delete this session?",hr:"Obrisati ovu sesiju?",de:"Diese Sitzung löschen?"},
+  yoga_type:{en:"Style",hr:"Stil",de:"Stil"},yoga_dur:{en:"Duration (min)",hr:"Trajanje (min)",de:"Dauer (min)"},yoga_focus:{en:"Focus",hr:"Fokus",de:"Fokus"},
+  // Analytics
+  analytics:{en:"📊 Analytics",hr:"📊 Analitika",de:"📊 Analytik"},tab_body:{en:"📏 Body",hr:"📏 Tijelo",de:"📏 Körper"},tab_strength:{en:"💪 Strength",hr:"💪 Snaga",de:"💪 Stärke"},tab_recovery:{en:"⌚ Recovery",hr:"⌚ Oporavak",de:"⌚ Erholung"},tab_prs:{en:"🏆 PRs",hr:"🏆 Rekordi",de:"🏆 Rekorde"},
+  no_data:{en:"No data yet",hr:"Nema podataka",de:"Noch keine Daten"},no_data_desc:{en:"Start tracking workouts and add weekly progress to see analytics.",hr:"Počni pratiti treninge i dodaj tjedni napredak za analitiku.",de:"Beginne Workouts zu tracken und füge wöchentlichen Fortschritt hinzu."},
+  weight_trend:{en:"WEIGHT TREND",hr:"TREND TEŽINE",de:"GEWICHTSTREND"},measurements:{en:"MEASUREMENTS (CM)",hr:"MJERE (CM)",de:"MASSE (CM)"},body_fat:{en:"BODY FAT %",hr:"POSTOTAK MASTI",de:"KÖRPERFETT %"},lift_prog:{en:"LIFT PROGRESSION (KG)",hr:"NAPREDAK DIZANJA (KG)",de:"HEBEFORTSCHRITT (KG)"},vol_tons:{en:"WEEKLY VOLUME (TONS)",hr:"TJEDNI VOLUMEN (TONE)",de:"WOCHENVOLUMEN (TONNEN)"},readiness_trend:{en:"READINESS TREND",hr:"TREND SPREMNOSTI",de:"BEREITSCHAFTSTREND"},total_prs:{en:"TOTAL PRs",hr:"UKUPNO REKORDI",de:"GESAMT REKORDE"},best_1rm:{en:"BEST 1RM",hr:"NAJBOLJI 1RM",de:"BESTER 1RM"},
+  add_progress:{en:"+ Add progress",hr:"+ Dodaj napredak",de:"+ Fortschritt hinzufügen"},add_checkin:{en:"+ Add check-in",hr:"+ Dodaj unos",de:"+ Check-in hinzufügen"},
+  // Settings
+  settings:{en:"⚙️ Settings",hr:"⚙️ Postavke",de:"⚙️ Einstellungen"},profile:{en:"👤 PROFILE",hr:"👤 PROFIL",de:"👤 PROFIL"},edit_profile:{en:"✏️ EDIT PROFILE",hr:"✏️ UREDI PROFIL",de:"✏️ PROFIL BEARBEITEN"},edit:{en:"✏️ Edit",hr:"✏️ Uredi",de:"✏️ Bearbeiten"},save:{en:"Save",hr:"Spremi",de:"Speichern"},saved:{en:"✓ Saved!",hr:"✓ Spremljeno!",de:"✓ Gespeichert!"},
+  name:{en:"NAME",hr:"IME",de:"NAME"},name_ph:{en:"Enter your name",hr:"Upiši ime",de:"Name eingeben"},age_lbl:{en:"AGE",hr:"DOB",de:"ALTER"},height_lbl:{en:"HEIGHT (cm)",hr:"VISINA (cm)",de:"GRÖSSE (cm)"},cur_weight:{en:"CURRENT WEIGHT (kg)",hr:"TRENUTNA TEŽINA (kg)",de:"AKTUELLES GEWICHT (kg)"},goal_weight:{en:"GOAL WEIGHT (kg)",hr:"CILJNA TEŽINA (kg)",de:"ZIELGEWICHT (kg)"},city_lbl:{en:"🌤️ CITY (for weather)",hr:"🌤️ GRAD (za vrijeme)",de:"🌤️ STADT (für Wetter)"},city_ph:{en:"e.g. Zagreb, London, Tokyo...",hr:"npr. Zagreb, Split, Rijeka...",de:"z.B. Berlin, München, Wien..."},
+  cur_week:{en:"CURRENT WEEK",hr:"TRENUTNI TJEDAN",de:"AKTUELLE WOCHE"},prog_editor:{en:"PROGRAM EDITOR",hr:"UREĐIVAČ PROGRAMA",de:"PROGRAMM-EDITOR"},prog_edit_desc:{en:"Tap a day to add or remove exercises.",hr:"Klikni na dan za dodavanje ili uklanjanje vježbi.",de:"Tippe auf einen Tag um Übungen hinzuzufügen."},reset_prog:{en:"Reset to default program",hr:"Vrati na zadani program",de:"Auf Standardprogramm zurücksetzen"},reset_confirm:{en:"Reset program to defaults?",hr:"Vratiti program na zadano?",de:"Programm auf Standard zurücksetzen?"},
+  smartwatch:{en:"⌚ SMARTWATCH",hr:"⌚ PAMETNI SAT",de:"⌚ SMARTWATCH"},watch_desc:{en:"Configures which health metrics appear in the morning check-in.",hr:"Konfigurira koje zdravstvene metrike se prikazuju u jutarnjem unosu.",de:"Konfiguriert welche Gesundheitsmetriken im Morgen-Check-in erscheinen."},
+  checkin:{en:"Check-in",hr:"Unos",de:"Check-in"},morning:{en:"MORNING CHECK-IN",hr:"JUTARNJI UNOS",de:"MORGEN CHECK-IN"},history:{en:"HISTORY",hr:"POVIJEST",de:"VERLAUF"},
+  backup:{en:"DATA BACKUP",hr:"SIGURNOSNA KOPIJA",de:"DATENSICHERUNG"},export_btn:{en:"📤 Export data (JSON)",hr:"📤 Izvezi podatke (JSON)",de:"📤 Daten exportieren (JSON)"},share_btn:{en:"📎 Share to Google Drive / Cloud",hr:"📎 Dijeli na Google Drive / oblak",de:"📎 Auf Google Drive / Cloud teilen"},import_btn:{en:"📥 Import data (JSON)",hr:"📥 Uvezi podatke (JSON)",de:"📥 Daten importieren (JSON)"},import_confirm:{en:"data entries? This will overwrite current data.",hr:"unosa podataka? Ovo će prebrisati trenutne podatke.",de:"Dateneinträge? Dies überschreibt aktuelle Daten."},backup_desc:{en:"Export saves everything. Share JSON to transfer data to another device.",hr:"Izvoz sprema sve. Podijeli JSON za prijenos na drugi uređaj.",de:"Export speichert alles. JSON teilen um Daten zu übertragen."},
+  delete_all:{en:"🗑 Delete all data",hr:"🗑 Obriši sve podatke",de:"🗑 Alle Daten löschen"},delete_confirm:{en:"Delete ALL data? This cannot be undone.",hr:"Obrisati SVE podatke? Ovo se ne može poništiti.",de:"ALLE Daten löschen? Dies kann nicht rückgängig gemacht werden."},
+  // Progress
+  weekly_prog:{en:"⚖️ Weekly Progress",hr:"⚖️ Tjedni napredak",de:"⚖️ Wöchentlicher Fortschritt"},lifts_weight:{en:"LIFTS & WEIGHT",hr:"DIZANJA I TEŽINA",de:"HEBEN & GEWICHT"},body_meas:{en:"📏 BODY MEASUREMENTS",hr:"📏 MJERE TIJELA",de:"📏 KÖRPERMASSE"},save_prog:{en:"Save progress",hr:"Spremi napredak",de:"Fortschritt speichern"},
+  // Weather
+  wx_set:{en:"Set your city for live weather",hr:"Postavi grad za živu prognozu",de:"Stadt für Live-Wetter einstellen"},wx_go:{en:"🥾 Go!",hr:"🥾 Idemo!",de:"🥾 Los!"},wx_check:{en:"⚠️ Check",hr:"⚠️ Provjeri",de:"⚠️ Prüfen"},wx_nope:{en:"🚫 Nope",hr:"🚫 Ne",de:"🚫 Nein"},wx_rain:{en:"rain",hr:"kiša",de:"Regen"},
+  // Insights
+  ins_low_ready:{en:"Very low readiness – rest day strongly recommended",hr:"Vrlo niska spremnost – preporučen dan odmora",de:"Sehr niedrige Bereitschaft – Ruhetag empfohlen"},ins_mod_ready:{en:"Moderate readiness – keep intensity light to medium",hr:"Umjerena spremnost – održi intenzitet lagani do umjereni",de:"Mäßige Bereitschaft – Intensität leicht bis mittel halten"},ins_good_ready:{en:"Good readiness – you can push hard today",hr:"Dobra spremnost – možeš dati sve od sebe",de:"Gute Bereitschaft – heute kannst du Vollgas geben"},ins_poor_sleep:{en:"Poor sleep – expect reduced strength and focus",hr:"Loš san – očekuj smanjenu snagu i fokus",de:"Schlechter Schlaf – reduzierte Kraft erwartet"},ins_avg_sleep:{en:"Average sleep – performance may be slightly lower",hr:"Prosječan san – performanse mogu biti malo niže",de:"Durchschnittlicher Schlaf – Leistung evtl. leicht reduziert"},ins_good_sleep:{en:"Great sleep – recovery is on track",hr:"Odličan san – oporavak je na pravom putu",de:"Toller Schlaf – Erholung auf Kurs"},ins_high_stress:{en:"High stress – consider mobility work or light session",hr:"Visoki stres – razmisli o mobilnosti ili laganom treningu",de:"Hoher Stress – Mobilität oder leichte Einheit empfohlen"},ins_mod_stress:{en:"Moderate stress – monitor during workout",hr:"Umjereni stres – prati tijekom treninga",de:"Mäßiger Stress – während Training beobachten"},ins_low_bat:{en:"Very low energy – body hasn't recovered",hr:"Vrlo niska energija – tijelo se nije oporavilo",de:"Sehr niedrige Energie – Körper hat sich nicht erholt"},ins_mod_bat:{en:"Moderate energy – don't max out today",hr:"Umjerena energija – nemoj pretjerivati danas",de:"Mäßige Energie – heute nicht ans Maximum gehen"},ins_high_bat:{en:"High energy – great day for PR attempts",hr:"Visoka energija – odličan dan za rekorde",de:"Hohe Energie – perfekter Tag für Rekordversuche"},ins_hr_high:{en:"Resting HR elevated – possible overtraining or illness",hr:"Puls u mirovanju povišen – moguć pretreniranost ili bolest",de:"Ruhepuls erhöht – mögliches Übertraining oder Krankheit"},ins_hr_low:{en:"Resting HR below average – excellent recovery",hr:"Puls u mirovanju ispod prosjeka – odličan oporavak",de:"Ruhepuls unter Durchschnitt – ausgezeichnete Erholung"},ins_deload:{en:"low readiness days this week – consider a deload week",hr:"dana niske spremnosti ovaj tjedan – razmisli o tjednu rasterećenja",de:"Tage niedriger Bereitschaft – erwäge eine Entlastungswoche"},ins_sleep_dec:{en:"Sleep quality declining – prioritize sleep hygiene",hr:"Kvaliteta sna pada – prioritiziraj higijenu sna",de:"Schlafqualität sinkt – Schlafhygiene priorisieren"},
+  score_exc:{en:"Excellent – peak performance day",hr:"Izvrsno – dan vrhunske izvedbe",de:"Ausgezeichnet – Spitzenleistungstag"},score_good:{en:"Good – solid training day",hr:"Dobro – solidan dan treninga",de:"Gut – solider Trainingstag"},score_fair:{en:"Fair – moderate session recommended",hr:"Korektno – preporučen umjeren trening",de:"Mittel – moderate Einheit empfohlen"},score_low:{en:"Low – light activity only",hr:"Nisko – samo lagana aktivnost",de:"Niedrig – nur leichte Aktivität"},score_crit:{en:"Critical – full rest recommended",hr:"Kritično – preporučen potpuni odmor",de:"Kritisch – vollständige Ruhe empfohlen"},
+  metric_bd:{en:"📊 METRIC BREAKDOWN",hr:"📊 PREGLED METRIKA",de:"📊 METRIK-ÜBERSICHT"},insights:{en:"💡 INSIGHTS",hr:"💡 UVIDI",de:"💡 ERKENNTNISSE"},overall:{en:"OVERALL SCORE",hr:"UKUPNA OCJENA",de:"GESAMTBEWERTUNG"},
+  // Language
+  language:{en:"🌐 LANGUAGE",hr:"🌐 JEZIK",de:"🌐 SPRACHE"},
+  // General
+  select:{en:"Select...",hr:"Odaberi...",de:"Auswählen..."},no_entries:{en:"No entries this week",hr:"Nema unosa ovaj tjedan",de:"Keine Einträge diese Woche"},
+  // Days & Program
+  week_n:{en:"WEEK",hr:"TJEDAN",de:"WOCHE"},day_n:{en:"Day",hr:"Dan",de:"Tag"},exercises_n:{en:"exercises",hr:"vježbi",de:"Übungen"},
+  mon:{en:"MON",hr:"PON",de:"MO"},tue:{en:"TUE",hr:"UTO",de:"DI"},wed:{en:"WED",hr:"SRI",de:"MI"},thu:{en:"THU",hr:"ČET",de:"DO"},fri:{en:"FRI",hr:"PET",de:"FR"},sat:{en:"SAT",hr:"SUB",de:"SA"},sun:{en:"SUN",hr:"NED",de:"SO"},
+  dt_chest_tri:{en:"Chest + Triceps",hr:"Prsa + Triceps",de:"Brust + Trizeps"},dt_back_bi:{en:"Back + Biceps",hr:"Leđa + Biceps",de:"Rücken + Bizeps"},dt_rest_climb:{en:"Rest / Climbing",hr:"Odmor / Penjanje",de:"Ruhe / Klettern"},dt_legs:{en:"Legs",hr:"Noge",de:"Beine"},dt_shoulders:{en:"Shoulders + Core",hr:"Ramena + Core",de:"Schultern + Core"},dt_climb_out:{en:"Climbing / Outdoor",hr:"Penjanje / Outdoor",de:"Klettern / Outdoor"},dt_rest:{en:"Rest",hr:"Odmor",de:"Ruhe"},
+  no_data_w:{en:"No data for",hr:"Nema podataka za",de:"Keine Daten für"},
+};
+let LANG = "en"; try { LANG = JSON.parse(localStorage.getItem("gc_lang")) || "en"; } catch(e) {}
+const t = (k) => (TR[k]||{})[LANG] || (TR[k]||{}).en || k;
+
+/* Simple SVG Charts - no external dependency */
+function SBar({data,dk,fill,h=140}){if(!data||!data.length)return null;const mx=Math.max(...data.map(d=>+(d[dk])||0),1);const bw=Math.min(30,Math.floor(280/data.length));
+  return (<svg width="100%" viewBox={`0 0 ${data.length*(bw+10)} ${h}`} style={{display:"block"}}>{data.map((d,i)=>{const v=+(d[dk])||0;const bh=(v/mx)*(h-32);
+    return (<g key={i} style={{animation:`barGrow 0.5s ease-out ${i*0.08}s both`,transformOrigin:"bottom"}}><rect x={i*(bw+10)+5} y={h-bh-22} width={bw} height={bh} rx={4} fill={fill} opacity={0.85}/>
+      <text x={i*(bw+10)+5+bw/2} y={h-6} textAnchor="middle" fill="#999" fontSize="10">{d.name}</text>
+      {v>0&&<text x={i*(bw+10)+5+bw/2} y={h-bh-26} textAnchor="middle" fill="#ccc" fontSize="10" style={{animation:`fadeIn 0.3s ease-out ${i*0.08+0.4}s both`}}>{v}</text>}
+    </g>);})}</svg>);}
+
+function SLine({data,lines,h=150}){if(!data||data.length<2)return null;const allV=lines.flatMap(l=>data.map(d=>+(d[l.key])||0));const mx=Math.max(...allV,1);const mn=Math.min(...allV,0);const rng=mx-mn||1;const p=25;const cw=Math.max(data.length*50,200);
+  return (<svg width="100%" viewBox={`0 0 ${cw} ${h}`} style={{display:"block"}}><style>{`@keyframes dl{from{stroke-dashoffset:2000}to{stroke-dashoffset:0}}@keyframes dp{from{r:0;opacity:0}to{r:3.5;opacity:1}}`}</style>{lines.map(line=>{const pts=data.map((d,i)=>{const v=+(d[line.key])||0;const x=p+i*((cw-p*2)/(data.length-1));const y=p+(1-(v-mn)/rng)*(h-p*2);return `${x},${y}`}).join(" ");
+    return (<polyline key={line.key} points={pts} fill="none" stroke={line.color} strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round" style={{strokeDasharray:2000,animation:"dl 1s ease-out forwards"}}/>);})}{data.map((d,i)=>{const x=p+i*((cw-p*2)/(data.length-1));return (<text key={i} x={x} y={h-4} textAnchor="middle" fill="#999" fontSize="10">{d.name}</text>)})}{lines.map(line=>data.map((d,i)=>{const v=+(d[line.key])||0;if(!v)return null;const x=p+i*((cw-p*2)/(data.length-1));const y=p+(1-(v-mn)/rng)*(h-p*2);return (<circle key={`${line.key}-${i}`} cx={x} cy={y} r={0} fill={line.color} style={{animation:`dp 0.3s ease-out ${0.7+i*0.1}s forwards`}}/>)}))}</svg>);}
+
+/* ═══════════ PROGRAM ═══════════ */
+const DEFAULT_PROGRAM = [
+  { day:1, title:"Chest + Triceps", titleKey:"dt_chest_tri", icon:"💪", type:"workout", exercises:[
+    {id:"d1e1",name:"Bench press",sets:4,reps:"6–8",muscle:"chest"},{id:"d1e2",name:"Incline dumbbell press",sets:4,reps:"8–10",muscle:"chest"},
+    {id:"d1e3",name:"Chest fly (machine/dumbbells)",sets:3,reps:"10–12",muscle:"chest"},{id:"d1e4",name:"Dips",sets:3,reps:"max",muscle:"chest"},
+    {id:"d1e5",name:"Triceps pushdown",sets:3,reps:"10–12",muscle:"triceps"},{id:"d1e6",name:"Skull crushers",sets:3,reps:"8–10",muscle:"triceps"},
+  ]},
+  { day:2, title:"Back + Biceps", titleKey:"dt_back_bi", icon:"🔥", type:"workout", exercises:[
+    {id:"d2e1",name:"Deadlift",sets:4,reps:"5",muscle:"back"},{id:"d2e2",name:"Pull-ups",sets:4,reps:"max",muscle:"back"},
+    {id:"d2e3",name:"Barbell row",sets:4,reps:"8–10",muscle:"back"},{id:"d2e4",name:"Lat pulldown",sets:3,reps:"10–12",muscle:"back"},
+    {id:"d2e5",name:"Barbell curl",sets:3,reps:"8–10",muscle:"biceps"},{id:"d2e6",name:"Hammer curl",sets:3,reps:"10–12",muscle:"biceps"},
+  ]},
+  { day:3, title:"Rest / Climbing", titleKey:"dt_rest_climb", icon:"🧗", type:"rest", activities:[
+    {name:"Climbing (bouldering or sport)",duration:"60–120 min",note:"Focus on technique"},
+    {name:"Core (plank, leg raises)",duration:"10–15 min",note:""},
+  ]},
+  { day:4, title:"Legs", titleKey:"dt_legs", icon:"🦵", type:"workout", exercises:[
+    {id:"d4e1",name:"Squat",sets:4,reps:"6–8",muscle:"quads"},{id:"d4e2",name:"Romanian deadlift",sets:4,reps:"8–10",muscle:"hamstrings"},
+    {id:"d4e3",name:"Leg press",sets:3,reps:"10–12",muscle:"quads"},{id:"d4e4",name:"Leg curl",sets:3,reps:"10–12",muscle:"hamstrings"},
+    {id:"d4e5",name:"Calf raises",sets:4,reps:"12–15",muscle:"calves"},
+  ]},
+  { day:5, title:"Shoulders + Core", titleKey:"dt_shoulders", icon:"🎯", type:"workout", exercises:[
+    {id:"d5e1",name:"Overhead press",sets:4,reps:"6–8",muscle:"shoulders"},{id:"d5e2",name:"Lateral raises",sets:4,reps:"12–15",muscle:"shoulders"},
+    {id:"d5e3",name:"Rear delt fly",sets:3,reps:"12–15",muscle:"shoulders"},{id:"d5e4",name:"Shrugs",sets:3,reps:"10–12",muscle:"traps"},
+    {id:"d5e5",name:"Hanging leg raises",sets:3,reps:"12–15",muscle:"core"},{id:"d5e6",name:"Cable crunch",sets:3,reps:"12–15",muscle:"core"},
+  ]},
+  { day:6, title:"Climbing / Active Rest", titleKey:"dt_climb_out", icon:"⛰️", type:"rest", activities:[
+    {name:"Climbing or light hike",duration:"60–120 min",note:""},
+    {name:"Mobility / stretching",duration:"15 min",note:""},
+  ]},
+  { day:7, title:"Rest", titleKey:"dt_rest", icon:"😴", type:"fullrest", note:"Full rest – focus on nutrition and recovery" },
+];
+
+const MUSCLES = ["chest","triceps","back","biceps","quads","hamstrings","calves","shoulders","traps","core","glutes","forearms"];
+const MC = {chest:"#ff6b6b",triceps:"#ffa94d",back:"#51cf66",biceps:"#339af0",quads:"#cc5de8",hamstrings:"#f06595",calves:"#20c997",shoulders:"#ffd43b",traps:"#ff922b",core:"#748ffc",glutes:"#e599f7",forearms:"#38d9a9"};
+const DN_KEYS = ["mon","tue","wed","thu","fri","sat","sun"];
+const getDN = () => DN_KEYS.map(k => t(k));
+const BG = ["V0","V1","V2","V3","V4","V5","V6","V7","V8","V9","V10","V11","V12"];
+const SG = ["4a","4b","4c","5a","5b","5c","6a","6a+","6b","6b+","6c","6c+","7a","7a+","7b","7b+","7c","7c+","8a"];
+const GRIPS = ["Half crimp","Open hand","Full crimp","3-finger drag","2-finger pocket"];
+const DIFF = ["Easy","Moderate","Hard","Expert"];
+const WATCHES = {
+  garmin: { name:"Garmin", icon:"⌚", fields:[
+    {k:"readiness",l:"Training Readiness",p:"0-100",i:"🎯"},{k:"battery",l:"Body Battery",p:"0-100",i:"🔋"},
+    {k:"sleep",l:"Sleep Score",p:"0-100",i:"😴"},{k:"recovery",l:"Recovery Time (h)",p:"hours",i:"⏳"},
+    {k:"stress",l:"Stress Level",p:"0-100",i:"😰"},{k:"rhr",l:"Resting HR",p:"bpm",i:"❤️"}]},
+  samsung: { name:"Galaxy Watch", icon:"⌚", fields:[
+    {k:"readiness",l:"Energy Score",p:"0-100",i:"⚡"},{k:"sleep",l:"Sleep Score",p:"0-100",i:"😴"},
+    {k:"stress",l:"Stress Level",p:"0-100",i:"😰"},{k:"rhr",l:"Resting HR",p:"bpm",i:"❤️"},
+    {k:"spo2",l:"Blood Oxygen",p:"%",i:"🫁"},{k:"battery",l:"Steps",p:"steps",i:"👟"}]},
+  apple: { name:"Apple Watch", icon:"⌚", fields:[
+    {k:"readiness",l:"Vitals Status",p:"0-100",i:"💚"},{k:"sleep",l:"Sleep Duration",p:"hours",i:"😴"},
+    {k:"rhr",l:"Resting HR",p:"bpm",i:"❤️"},{k:"battery",l:"HRV",p:"ms",i:"📈"},
+    {k:"spo2",l:"Blood Oxygen",p:"%",i:"🫁"},{k:"stress",l:"Mindfulness",p:"min",i:"🧘"}]},
+  fitbit: { name:"Fitbit / Pixel", icon:"⌚", fields:[
+    {k:"readiness",l:"Readiness Score",p:"0-100",i:"🎯"},{k:"sleep",l:"Sleep Score",p:"0-100",i:"😴"},
+    {k:"stress",l:"Stress Score",p:"0-100",i:"😰"},{k:"rhr",l:"Resting HR",p:"bpm",i:"❤️"},
+    {k:"spo2",l:"SpO2",p:"%",i:"🫁"},{k:"battery",l:"Active Zone Min",p:"min",i:"🔥"}]},
+  other: { name:"Other / Manual", icon:"⌚", fields:[
+    {k:"readiness",l:"Energy Level",p:"0-100",i:"⚡"},{k:"sleep",l:"Sleep (hours)",p:"hours",i:"😴"},
+    {k:"stress",l:"Stress Level",p:"0-100",i:"😰"},{k:"rhr",l:"Resting HR",p:"bpm",i:"❤️"}]},
+};
+
+const e1rm = (w, r) => (!w || !r || r < 1) ? 0 : Math.round(w * (1 + r / 30));
+
+/* ═══════════ LOCALSTORAGE ═══════════ */
+const ld = (k, fb) => {
+  try {
+    const v = localStorage.getItem("gc_" + k);
+    return v !== null ? JSON.parse(v) : fb;
+  } catch (e) { return fb; }
+};
+const sd = (k, v) => {
+  try { localStorage.setItem("gc_" + k, JSON.stringify(v)); }
+  catch (e) { console.error(e); }
+};
+
+const rcol = (v) => v >= 60 ? "#51cf66" : v >= 35 ? "#ffd43b" : "#ff4757";
+const rlab = (v) => v >= 60 ? "Ready 💪" : v >= 35 ? "Caution ⚡" : "Rest ⛔";
+const bcol = (v) => v >= 60 ? "#51cf66" : v >= 30 ? "#ffd43b" : "#ff4757";
+const scol = (v) => v >= 70 ? "#51cf66" : v >= 50 ? "#ffd43b" : "#ff4757";
+
+const SZ = { xs:12, sm:14, md:18, lg:22, xl:26, xxl:34, icon:29, iconLg:36, cardTitle:20, cardSub:16, navIcon:26, navLabel:12, input:20, btn:19 };
+const Fn = "'DM Sans',sans-serif";
+const Mo = "'Space Mono',monospace";
+
+/* ═══════════ REST TIMER ═══════════ */
+function RestTimer({ onClose }) {
+  const [s, setS] = useState(90);
+  const [run, setRun] = useState(false);
+  const [ini, setIni] = useState(90);
+  const ref = useRef(null);
+  useEffect(() => {
+    if (run && s > 0) ref.current = setInterval(() => setS(x => x - 1), 1000);
+    else if (s === 0 && run) { setRun(false); try { navigator.vibrate?.(500); } catch (e) {} }
+    return () => clearInterval(ref.current);
+  }, [run, s]);
+  const pct = ini > 0 ? (s / ini) * 100 : 0;
+  const mm = String(Math.floor(s / 60)).padStart(2, "0");
+  const ss = String(s % 60).padStart(2, "0");
+  return (
+    <div style={{position:"fixed",inset:0,zIndex:1000,background:"rgba(0,0,0,0.92)",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",backdropFilter:"blur(12px)",WebkitBackdropFilter:"blur(12px)"}}>
+      <button onClick={onClose} style={{position:"absolute",top:20,right:20,background:"none",border:"none",color:"#888",fontSize:36,cursor:"pointer"}}>✕</button>
+      <p style={{color:"#999",fontSize:SZ.sm,letterSpacing:3,textTransform:"uppercase",marginBottom:24}}>{t("tim_rest")}</p>
+      <div style={{width:220,height:220,borderRadius:"50%",background:`conic-gradient(${s===0?"#ff4757":"#00d2ff"} ${pct}%, #1a1a2e ${pct}%)`,display:"flex",alignItems:"center",justifyContent:"center"}}>
+        <div style={{width:186,height:186,borderRadius:"50%",background:"#0d0d1a",display:"flex",alignItems:"center",justifyContent:"center"}}>
+          <span style={{fontSize:56,fontWeight:700,color:s===0?"#ff4757":"#fff",fontFamily:Mo}}>{mm}:{ss}</span>
+        </div>
+      </div>
+      <div style={{display:"flex",gap:12,marginTop:28}}>
+        <button onClick={() => setRun(!run)} style={{padding:"14px 38px",borderRadius:50,border:"none",fontSize:SZ.btn,fontWeight:600,background:run?"#ff4757":"#00d2ff",color:run?"#fff":"#000",cursor:"pointer"}}>{run?"Pause":s===0?"Done!":"Start"}</button>
+        <button onClick={() => {setRun(false);setS(ini)}} style={{padding:"14px 26px",borderRadius:50,border:"1px solid #333",background:"none",color:"#aaa",fontSize:SZ.btn,cursor:"pointer"}}>Reset</button>
+      </div>
+      <div style={{display:"flex",gap:8,marginTop:22}}>
+        {[60,90,120,180].map(p => (
+          <button key={p} onClick={() => {setIni(p);setS(p);setRun(false)}} style={{padding:"9px 18px",borderRadius:22,border:ini===p?"1px solid #00d2ff":"1px solid #333",background:ini===p?"rgba(0,210,255,0.1)":"none",color:ini===p?"#00d2ff":"#999",fontSize:SZ.md,cursor:"pointer"}}>{p}s</button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/* ═══════════ MAIN APP ═══════════ */
+function App() {
+  const [view, setView] = useState("home");
+  const [selDay, setSelDay] = useState(null);
+  const [week, setWeek] = useState(() => ld("wk", 1));
+  const [program, setProgram] = useState(() => ld("program", null) || DEFAULT_PROGRAM);
+  const [wd, setWd] = useState(() => ld("wd", {}));
+  const [cs, setCs] = useState(() => ld("cs", {}));
+  const [prog, setProg] = useState(() => ld("prog", []));
+  const [name, setName] = useState(() => ld("nm", ""));
+  const [height, setHeight] = useState(() => ld("ht", ""));
+  const [curWeight, setCurWeight] = useState(() => ld("cw", ""));
+  const [goalWeight, setGoalWeight] = useState(() => ld("gw", ""));
+  const [age, setAge] = useState(() => ld("age", ""));
+  const [city, setCity] = useState(() => ld("city", ""));
+  const [saved, setSaved] = useState(false);
+  const [profEdit, setProfEdit] = useState(() => !ld("nm", ""));
+  const [ae, setAe] = useState(null);
+  const [climb, setClimb] = useState(() => ld("cl", []));
+  const [finger, setFinger] = useState(() => ld("fi", []));
+  const [prs, setPrs] = useState(() => ld("prs", []));
+  const [garmin, setGarmin] = useState(() => ld("gm", []));
+  const [watchType, setWatchType] = useState(() => ld("wt", "garmin"));
+  const [postWO, setPostWO] = useState(() => ld("pwo", []));
+  const [hikes, setHikes] = useState(() => ld("hikes", []));
+  const [runs, setRuns] = useState(() => ld("runs", []));
+  const [yogas, setYogas] = useState(() => ld("yoga", []));
+  const [showTimer, setShowTimer] = useState(false);
+  const [dismissed, setDismissed] = useState(() => ld("dismissed", {}));
+  const [expEntry, setExpEntry] = useState(null);
+  const [showPF, setShowPF] = useState(false);
+  const [dashTab, setDashTab] = useState("body");
+  const [outTab, setOutTab] = useState("climb");
+  const [editDay, setEditDay] = useState(null);
+  const [addEx, setAddEx] = useState(null);
+  const [dateRange, setDateRange] = useState("all");
+  const [lang, setLang] = useState(() => ld("lang", "en"));
+  const [weather, setWeather] = useState(null);
+  const [wxEdit, setWxEdit] = useState(false);
+  const [wxCity, setWxCity] = useState("");
+  const [wxSug, setWxSug] = useState([]);
+  const wxTimer = useRef(null);
+
+  // Weather fetch - uses saved city name
+  const fetchWeather = useCallback(async (cityName) => {
+    if (!cityName || cityName.length < 2) return;
+    try {
+      const geo = await fetch(`https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(cityName)}&count=1`);
+      const geoData = await geo.json();
+      if (!geoData?.results?.length) return;
+      const {latitude: lat, longitude: lon, name: placeName, country} = geoData.results[0];
+      const res = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,wind_speed_10m,weather_code,relative_humidity_2m&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max&timezone=auto&forecast_days=1`);
+      const data = await res.json();
+      const wc = data?.current?.weather_code || 0;
+      const wcMap = {0:"☀️",1:"🌤️",2:"⛅",3:"☁️",45:"🌫️",48:"🌫️",51:"🌦️",53:"🌦️",55:"🌧️",61:"🌧️",63:"🌧️",65:"🌧️",71:"🌨️",73:"🌨️",75:"❄️",77:"❄️",80:"🌦️",81:"🌧️",82:"⛈️",85:"🌨️",86:"❄️",95:"⛈️",96:"⛈️",99:"⛈️"};
+      const condMap = {0:"Clear sky",1:"Mainly clear",2:"Partly cloudy",3:"Overcast",45:"Foggy",48:"Fog",51:"Light drizzle",53:"Drizzle",55:"Heavy drizzle",61:"Light rain",63:"Rain",65:"Heavy rain",71:"Light snow",73:"Snow",75:"Heavy snow",80:"Showers",81:"Rain showers",82:"Heavy showers",85:"Snow showers",95:"Thunderstorm"};
+      const temp = data?.current?.temperature_2m;
+      const wind = data?.current?.wind_speed_10m;
+      const humidity = data?.current?.relative_humidity_2m;
+      const rain = data?.daily?.precipitation_probability_max?.[0] || 0;
+      const hikeOk = wc <= 3 && wind < 40 && rain < 50;
+      const hikeCaution = wc <= 55 && wind < 60 && rain < 80;
+      setWeather({icon:wcMap[wc]||"🌤️", cond:condMap[wc]||"Unknown", temp, wind, humidity, rain, hikeOk, hikeCaution, city:`${placeName}, ${country}`, wc});
+    } catch (e) { console.error("Weather:", e); }
+  }, []);
+
+  const fetchWeatherByCoords = useCallback(async (lat, lon) => {
+    try {
+      const res = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,wind_speed_10m,weather_code,relative_humidity_2m&daily=precipitation_probability_max&timezone=auto&forecast_days=1`);
+      const data = await res.json();
+      const wc = data?.current?.weather_code || 0;
+      const wcMap = {0:"☀️",1:"🌤️",2:"⛅",3:"☁️",45:"🌫️",48:"🌫️",51:"🌦️",53:"🌦️",55:"🌧️",61:"🌧️",63:"🌧️",65:"🌧️",71:"🌨️",73:"🌨️",75:"❄️",80:"🌦️",81:"🌧️",82:"⛈️",95:"⛈️"};
+      const condMap = {0:"Clear sky",1:"Mainly clear",2:"Partly cloudy",3:"Overcast",45:"Foggy",51:"Light drizzle",55:"Heavy drizzle",61:"Light rain",63:"Rain",65:"Heavy rain",71:"Light snow",75:"Heavy snow",80:"Showers",95:"Thunderstorm"};
+      const temp = data?.current?.temperature_2m;
+      const wind = data?.current?.wind_speed_10m;
+      const humidity = data?.current?.relative_humidity_2m;
+      const rain = data?.daily?.precipitation_probability_max?.[0] || 0;
+      const hikeOk = wc <= 3 && wind < 40 && rain < 50;
+      const hikeCaution = wc <= 55 && wind < 60 && rain < 80;
+      const tz = data?.timezone || "";
+      const cityName = tz.split("/").pop()?.replace(/_/g, " ") || "GPS";
+      setWeather({icon:wcMap[wc]||"🌤️", cond:condMap[wc]||"Unknown", temp, wind, humidity, rain, hikeOk, hikeCaution, city:cityName, wc});
+    } catch (e) {}
+  }, []);
+
+  const searchCities = useCallback(async (q) => {
+    if (!q || q.length < 2) { setWxSug([]); return; }
+    try {
+      const r = await fetch(`https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(q)}&count=6&language=${LANG}`);
+      const d = await r.json();
+      setWxSug(d?.results || []);
+    } catch(e) { setWxSug([]); }
+  }, []);
+
+  const pickCity = useCallback((c) => {
+    const name = `${c.name}, ${c.country}`;
+    setCity(c.name); sd("city", c.name); setWxCity(name); setWxSug([]); setWxEdit(false);
+    // Fetch weather directly with coords (faster, no second geocoding call)
+    fetchWeatherByCoords(c.latitude, c.longitude);
+  }, [fetchWeatherByCoords]);
+
+  useEffect(() => { 
+    if (city) { fetchWeather(city); } 
+    else if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (pos) => fetchWeatherByCoords(pos.coords.latitude, pos.coords.longitude),
+        () => {}, {enableHighAccuracy:false, timeout:8000}
+      );
+    }
+  }, [city]);
+
+  // Save helpers (sync localStorage)
+  const uwd = useCallback((k, v) => { const n = {...wd,[k]:v}; setWd(n); sd("wd",n); }, [wd]);
+  const tog = useCallback((di,ei,si) => { const k=`${week}-${di}-${ei}-${si}`; const n={...cs,[k]:!cs[k]}; setCs(n); sd("cs",n); }, [cs,week]);
+  const chW = useCallback((w) => { setWeek(w); sd("wk",w); }, []);
+  const svN = useCallback((n) => { setName(n); sd("nm",n); }, []);
+  const svProg = useCallback((e) => { const n=[...prog,{...e,week,date:new Date().toISOString()}]; setProg(n); sd("prog",n); }, [prog,week]);
+  const svClimb = useCallback((e) => { const n=[...climb,{...e,id:Date.now(),date:new Date().toISOString(),week}]; setClimb(n); sd("cl",n); }, [climb,week]);
+  const delClimb = useCallback((id) => { const s=String(id); const n=climb.filter(c=>String(c.id||c.date)!==s); setClimb(n); sd("cl",n); }, [climb]);
+  const svFinger = useCallback((e) => { const n=[...finger,{...e,id:Date.now(),date:new Date().toISOString(),week}]; setFinger(n); sd("fi",n); }, [finger,week]);
+  const delFinger = useCallback((id) => { const s=String(id); const n=finger.filter(f=>String(f.id||f.date)!==s); setFinger(n); sd("fi",n); }, [finger]);
+  const svGarmin = useCallback((e) => { const n=[...garmin,{...e,id:Date.now(),date:new Date().toISOString(),week}]; setGarmin(n); sd("gm",n); }, [garmin,week]);
+  const svPostWO = useCallback((e) => { const n=[...postWO,{...e,id:Date.now(),date:new Date().toISOString(),week}]; setPostWO(n); sd("pwo",n); }, [postWO,week]);
+  const svHike = useCallback((e) => { const n=[...hikes,{...e,id:Date.now(),date:new Date().toISOString(),week}]; setHikes(n); sd("hikes",n); }, [hikes,week]);
+  const delHike = useCallback((id) => { const s=String(id); const n=hikes.filter(h=>String(h.id||h.date)!==s); setHikes(n); sd("hikes",n); }, [hikes]);
+  const updClimb = useCallback((id,data) => { const s=String(id); const n=climb.map(c=>String(c.id||c.date)===s?{...c,...data}:c); setClimb(n); sd("cl",n); }, [climb]);
+  const updHike = useCallback((id,data) => { const s=String(id); const n=hikes.map(h=>String(h.id||h.date)===s?{...h,...data}:h); setHikes(n); sd("hikes",n); }, [hikes]);
+  const updFinger = useCallback((id,data) => { const s=String(id); const n=finger.map(f=>String(f.id||f.date)===s?{...f,...data}:f); setFinger(n); sd("fi",n); }, [finger]);
+  const svRun = useCallback((e) => { const n=[...runs,{...e,id:Date.now(),date:new Date().toISOString(),week}]; setRuns(n); sd("runs",n); }, [runs,week]);
+  const delRun = useCallback((id) => { const s=String(id); const n=runs.filter(r=>String(r.id||r.date)!==s); setRuns(n); sd("runs",n); }, [runs]);
+  const updRun = useCallback((id,data) => { const s=String(id); const n=runs.map(r=>String(r.id||r.date)===s?{...r,...data}:r); setRuns(n); sd("runs",n); }, [runs]);
+  const svYoga = useCallback((e) => { const n=[...yogas,{...e,id:Date.now(),date:new Date().toISOString(),week}]; setYogas(n); sd("yoga",n); }, [yogas,week]);
+  const delYoga = useCallback((id) => { const s=String(id); const n=yogas.filter(y=>String(y.id||y.date)!==s); setYogas(n); sd("yoga",n); }, [yogas]);
+  const updYoga = useCallback((id,data) => { const s=String(id); const n=yogas.map(y=>String(y.id||y.date)===s?{...y,...data}:y); setYogas(n); sd("yoga",n); }, [yogas]);
+  const saveProgram = useCallback((p) => { setProgram(p); sd("program",p); }, []);
+
+  const removeExercise = useCallback((dayIdx, exIdx) => {
+    const np = program.map((d, i) => i !== dayIdx ? d : {...d, exercises: d.exercises.filter((_, j) => j !== exIdx)});
+    saveProgram(np);
+  }, [program, saveProgram]);
+
+  const addExercise = useCallback((dayIdx, ex) => {
+    const np = program.map((d, i) => i !== dayIdx ? d : {...d, exercises: [...(d.exercises||[]), {...ex, id:`d${dayIdx}e${Date.now()}`}]});
+    saveProgram(np);
+  }, [program, saveProgram]);
+
+  const detectPR = useCallback((exN, w, r) => {
+    if (!w || w <= 0) return false;
+    const v = e1rm(w, r);
+    const ex = prs.find(p => p.exercise === exN);
+    if (!ex || v > ex.e1rm) {
+      const entry = {exercise:exN,weight:Number(w),reps:Number(r),e1rm:v,week,date:new Date().toISOString()};
+      const next = ex ? prs.map(p => p.exercise===exN ? entry : p) : [...prs, entry];
+      setPrs(next); sd("prs", next);
+      return true;
+    }
+    return false;
+  }, [prs, week]);
+
+  const gsk = (d,e,s) => `${week}-${d}-${e}-${s}`;
+  const gdk = (d,e,s,f) => `${week}-${d}-${e}-${s}-${f}`;
+  const pvk = (d,e,s,f) => `${week-1}-${d}-${e}-${s}-${f}`;
+
+  const completeEx = (dayIdx, exIdx) => {
+    const ex = program[dayIdx].exercises[exIdx];
+    const n = {...cs};
+    for (let s = 0; s < ex.sets; s++) n[gsk(dayIdx, exIdx, s)] = true;
+    setCs(n); sd("cs", n);
+  };
+
+  const completeDay = (dayIdx) => {
+    const d = program[dayIdx]; const n = {...cs};
+    if (d.type === "workout" && d.exercises) {
+      d.exercises.forEach((ex, ei) => { for (let s = 0; s < ex.sets; s++) n[gsk(dayIdx, ei, s)] = true; });
+    } else if (d.type === "rest" && d.activities) {
+      d.activities.forEach((_, i) => { n[`${week}-${dayIdx}-rest-${i}`] = true; });
+    } else if (d.type === "fullrest") {
+      n[`${week}-${dayIdx}-fullrest`] = true;
+    }
+    setCs(n); sd("cs", n);
+  };
+
+  const dayProg = (di) => {
+    const d = program[di]; if (d.type !== "workout" || !d.exercises) return null;
+    let t=0, done=0;
+    d.exercises.forEach((ex,ei) => { for(let s=0; s<ex.sets; s++) { t++; if(cs[gsk(di,ei,s)]) done++; } });
+    return t > 0 ? Math.round((done/t)*100) : 0;
+  };
+
+  const dayVol = (wk,di) => {
+    const d = program[di]; if (d.type !== "workout" || !d.exercises) return 0;
+    let v = 0;
+    d.exercises.forEach((ex,ei) => { for(let s=0; s<ex.sets; s++) { v += (Number(wd[`${wk}-${di}-${ei}-${s}-w`])||0) * (Number(wd[`${wk}-${di}-${ei}-${s}-r`])||0); } });
+    return v;
+  };
+
+  const weekVol = (wk) => { let v=0; for(let i=0;i<7;i++) v+=dayVol(wk,i); return v; };
+  const latestGM = garmin.filter(g => g.week === week).slice(-1)[0];
+  const isLowRec = latestGM && ((Number(latestGM.readiness)||100) < 35 || (Number(latestGM.battery)||100) < 25);
+
+  /* ═══ HOME ═══ */
+  const renderHome = () => (
+    <div style={{padding:"0 16px"}}>
+      <div style={{padding:"24px 0 8px",paddingTop:"calc(24px + env(safe-area-inset-top, 0px))"}}>
+        <p style={{color:"#999",fontSize:SZ.sm,letterSpacing:2,textTransform:"uppercase",margin:0}}>{t("week_n")} {week}</p>
+        <h1 style={{color:"#fff",fontSize:SZ.xxl,fontWeight:700,margin:"4px 0 0"}}>{name ? `Hey, ${name}` : "GymClimb"}</h1>
+      </div>
+
+      <div style={{display:"flex",gap:6,margin:"14px 0",overflowX:"auto",WebkitOverflowScrolling:"touch",paddingBottom:4}}>
+        {Array.from({length:12},(_,i)=>i+1).map(w => (
+          <button key={w} onClick={() => chW(w)} style={{minWidth:44,height:38,borderRadius:19,border:"none",fontSize:SZ.md,fontWeight:600,background:w===week?"#00d2ff":"#151520",color:w===week?"#000":"#999",cursor:"pointer",flexShrink:0}}>W{w}</button>
+        ))}
+      </div>
+
+      {/* Garmin Card */}
+      <GarminCard gm={latestGM} isLow={isLowRec} onAdd={() => setView("garmin")} />
+
+      {isLowRec && (
+        <div style={{background:"rgba(255,71,87,0.08)",border:"1px solid rgba(255,71,87,0.25)",borderRadius:14,padding:"14px 16px",marginBottom:12}}>
+          <p style={{color:"#ff4757",fontSize:SZ.md,fontWeight:600,margin:0}}>⚠️ Low recovery – consider rest</p>
+        </div>
+      )}
+
+      {/* Weather Widget */}
+      {weather && !wxEdit ? (
+        <div style={{background:"linear-gradient(135deg,#0f1525,#151530)",borderRadius:16,padding:"14px 18px",marginBottom:12,border:"1px solid #1a1a30",display:"flex",alignItems:"center",gap:14,animation:"fadeUp 0.4s ease-out both"}}>
+          <span className={weather.wc<=3?"wx-sun":"wx-cloud"} style={{fontSize:42,flexShrink:0}}>{weather.icon}</span>
+          <div style={{flex:1}}>
+            <div style={{display:"flex",alignItems:"baseline",gap:6}}>
+              <span style={{color:"#fff",fontSize:SZ.xl,fontWeight:700,fontFamily:Mo}}>{weather.temp}°</span>
+              <span style={{color:"#999",fontSize:SZ.sm}}>{weather.cond}</span>
+            </div>
+            <p onClick={() => {setWxEdit(true);setWxCity(city||"")}} style={{color:"#777",fontSize:SZ.xs,margin:"3px 0 0",cursor:"pointer"}}>
+              {weather.city && `📍 ${weather.city} `}💨 {weather.wind} km/h · 💧 {weather.humidity}% <span style={{color:"#555"}}>✏️</span>
+            </p>
+          </div>
+          <div style={{textAlign:"center",flexShrink:0}}>
+            <p style={{color:weather.hikeOk?"#51cf66":weather.hikeCaution?"#ffd43b":"#ff4757",fontSize:SZ.sm,fontWeight:700,margin:0}}>
+              {weather.hikeOk?t("wx_go"):weather.hikeCaution?t("wx_check"):t("wx_nope")}
+            </p>
+            <p style={{color:"#555",fontSize:9,margin:"2px 0 0"}}>{weather.rain}% {t("wx_rain")}</p>
+          </div>
+        </div>
+      ) : null}
+
+      {/* Activity Recommendations based on weather */}
+      {weather && !wxEdit && (() => {
+        const w = weather;
+        const hot = w.temp > 30, cold = w.temp < 5, mild = w.temp >= 10 && w.temp <= 25;
+        const rainy = w.wc >= 61, snowy = w.wc >= 71 && w.wc <= 77, stormy = w.wc >= 95;
+        const windy = w.wind > 35, calm = w.wind < 15;
+        const dry = w.rain < 20;
+        const acts = [
+          {icon:"🥾",name:t("hike"),score:stormy?0:rainy?1:snowy?1:windy?1:hot?2:cold&&dry?2:mild&&calm?3:dry?3:2},
+          {icon:"🏃",name:LANG==="hr"?"Trčanje":LANG==="de"?"Laufen":"Run",score:stormy?0:rainy?1:hot?1:snowy?1:cold&&dry?2:mild?3:2},
+          {icon:"🧗",name:t("climb"),score:stormy?0:rainy?0:snowy?0:windy?1:hot?2:cold?2:mild&&dry?3:2},
+          {icon:"🏋️",name:LANG==="hr"?"Teretana":LANG==="de"?"Gym":"Gym",score:3},
+          {icon:"🧘",name:LANG==="hr"?"Yoga":LANG==="de"?"Yoga":"Yoga",score:3},
+        ];
+        const colors = ["#ff4757","#ffa94d","#ffd43b","#51cf66"];
+        const labels = LANG==="hr"?["Izbjegni","Oprez","OK","Odlično"]:LANG==="de"?["Vermeiden","Vorsicht","OK","Perfekt"]:["Avoid","Caution","OK","Perfect"];
+        const tip = stormy?(LANG==="hr"?"⛈️ Nevrijeme – ostani unutra!":LANG==="de"?"⛈️ Gewitter – drinnen bleiben!":"⛈️ Storm – stay indoors!")
+          :rainy?(LANG==="hr"?"🌧️ Kišovito – idealno za teretanu":LANG==="de"?"🌧️ Regnerisch – perfekt fürs Gym":"🌧️ Rainy – perfect gym day")
+          :hot?(LANG==="hr"?"🔥 Vruće – hidracija + rani trening":LANG==="de"?"🔥 Heiß – hydrieren + früh trainieren":"🔥 Hot – hydrate + train early")
+          :cold?(LANG==="hr"?"❄️ Hladno – dobro zagrijavanje!":LANG==="de"?"❄️ Kalt – gut aufwärmen!":"❄️ Cold – warm up well!")
+          :mild&&calm&&dry?(LANG==="hr"?"✨ Savršeno vrijeme za sve!":LANG==="de"?"✨ Perfektes Wetter für alles!":"✨ Perfect conditions for everything!")
+          :"";
+        return (
+          <div style={{background:"#111118",borderRadius:14,padding:"12px 14px",marginBottom:12,border:"1px solid #1a1a25",animation:"fadeUp 0.4s ease-out 0.1s both"}}>
+            <div style={{display:"flex",gap:6,justifyContent:"space-between"}}>
+              {acts.map(a=>(
+                <div key={a.name} style={{flex:1,textAlign:"center",padding:"8px 2px",borderRadius:10,background:`${colors[a.score]}08`}}>
+                  <div style={{fontSize:22,marginBottom:4}}>{a.icon}</div>
+                  <div style={{width:8,height:8,borderRadius:4,background:colors[a.score],margin:"0 auto 4px"}}/>
+                  <p style={{color:"#ccc",fontSize:9,margin:0,fontWeight:600}}>{a.name}</p>
+                  <p style={{color:colors[a.score],fontSize:8,margin:"2px 0 0"}}>{labels[a.score]}</p>
+                </div>
+              ))}
+            </div>
+            {tip&&<p style={{color:"#999",fontSize:SZ.xs,margin:"10px 0 0",textAlign:"center",fontStyle:"italic"}}>{tip}</p>}
+          </div>
+        );
+      })()}
+      {!weather && !wxEdit ? (
+        <div style={{display:"flex",gap:8,marginBottom:12,animation:"fadeUp 0.3s ease-out both"}}>
+          <button onClick={() => setWxEdit(true)} style={{flex:1,padding:"14px",borderRadius:14,border:"1px dashed rgba(116,143,252,0.25)",background:"linear-gradient(135deg,#0f1525,#151530)",color:"#748ffc",fontSize:SZ.sm,fontWeight:600,cursor:"pointer",textAlign:"center"}}>🌤️ {t("wx_set")}</button>
+          <button onClick={() => {
+            if (!navigator.geolocation) return;
+            navigator.geolocation.getCurrentPosition(
+              (pos) => fetchWeatherByCoords(pos.coords.latitude, pos.coords.longitude),
+              () => alert("GPS not available"), {enableHighAccuracy:false,timeout:8000}
+            );
+          }} style={{width:52,padding:"14px",borderRadius:14,border:"1px solid rgba(116,143,252,0.15)",background:"#111118",color:"#748ffc",fontSize:22,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}>📍</button>
+        </div>
+      ) : null}
+
+      {wxEdit && (
+        <div style={{background:"linear-gradient(135deg,#0f1525,#151530)",borderRadius:16,padding:"14px 16px",marginBottom:12,border:"1px solid rgba(116,143,252,0.2)",animation:"fadeUp 0.3s ease-out both"}}>
+          <p style={{color:"#748ffc",fontSize:SZ.xs,letterSpacing:2,margin:"0 0 8px",fontWeight:600}}>🌤️ {t("wx_set")}</p>
+          <div style={{display:"flex",gap:8}}>
+            <input type="text" placeholder={t("city_ph")} value={wxCity} 
+              onKeyDown={e => { if(e.key==="Enter"&&wxCity.trim()) { setCity(wxCity.trim()); sd("city",wxCity.trim()); fetchWeather(wxCity.trim()); setWxEdit(false); setWxSug([]); }}}
+              onChange={e => {
+                setWxCity(e.target.value);
+                clearTimeout(wxTimer.current);
+                wxTimer.current = setTimeout(() => searchCities(e.target.value), 300);
+              }} style={{flex:1,padding:"11px 14px",borderRadius:10,border:"1px solid #222",background:"#0a0a14",color:"#fff",fontSize:SZ.md,outline:"none"}}/>
+            <button onClick={() => {
+              if(wxCity.trim()) { setCity(wxCity.trim()); sd("city",wxCity.trim()); fetchWeather(wxCity.trim()); }
+              setWxEdit(false); setWxSug([]);
+            }} style={{padding:"11px 18px",borderRadius:10,border:"none",background:"#00d2ff",color:"#000",fontWeight:700,fontSize:SZ.md,cursor:"pointer"}}>OK</button>
+            <button onClick={() => {setWxEdit(false);setWxSug([])}} style={{padding:"11px 12px",borderRadius:10,border:"1px solid #333",background:"none",color:"#999",fontSize:SZ.md,cursor:"pointer"}}>✕</button>
+          </div>
+          {wxSug.length>0&&<div style={{marginTop:6,borderRadius:10,overflow:"hidden",border:"1px solid #222"}}>
+            {wxSug.map((c,i)=>(<button key={i} onClick={() => pickCity(c)} style={{width:"100%",padding:"12px 14px",border:"none",borderTop:i?"1px solid #1a1a25":"none",background:"#0a0a14",color:"#fff",fontSize:SZ.md,cursor:"pointer",textAlign:"left",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+              <span>📍 {c.name}{c.admin1?`, ${c.admin1}`:""}</span>
+              <span style={{color:"#777",fontSize:SZ.xs}}>{c.country}</span>
+            </button>))}
+          </div>}
+          <button onClick={() => {
+            setWxEdit(false); setWxSug([]);
+            if (navigator.geolocation) navigator.geolocation.getCurrentPosition(
+              (pos) => fetchWeatherByCoords(pos.coords.latitude, pos.coords.longitude),
+              () => {}, {enableHighAccuracy:false,timeout:8000}
+            );
+          }} style={{width:"100%",marginTop:8,padding:"10px",borderRadius:10,border:"1px solid #222",background:"none",color:"#999",fontSize:SZ.sm,cursor:"pointer"}}>📍 GPS</button>
+        </div>
+      )}
+
+      <div style={{display:"flex",flexDirection:"column",gap:8}}>
+        {program.map((day, idx) => {
+          const p = dayProg(idx); const v = dayVol(week, idx);
+          return (
+            <button key={idx} onClick={() => {setSelDay(idx);setView("day");setAe(null)}}
+              style={{background:p===100?"rgba(0,210,255,0.03)":"#111118",borderRadius:16,padding:"16px 18px",border:p===100?"1px solid rgba(0,210,255,0.25)":"1px solid #1a1a25",cursor:"pointer",textAlign:"left",display:"flex",alignItems:"center",gap:14,width:"100%",animation:`fadeUp 0.35s ease-out ${0.05*idx}s both`}}>
+              <div style={{width:52,height:52,borderRadius:14,display:"flex",alignItems:"center",justifyContent:"center",fontSize:SZ.icon,flexShrink:0,background:day.type==="workout"?"rgba(0,210,255,0.07)":day.type==="rest"?"rgba(81,207,102,0.07)":"rgba(255,255,255,0.03)"}}>{day.icon}</div>
+              <div style={{flex:1,minWidth:0}}>
+                <p style={{color:"#999",fontSize:SZ.sm,letterSpacing:1,margin:0}}>{getDN()[idx]} – {t("day_n")} {day.day}</p>
+                <p style={{color:"#eee",fontSize:SZ.cardTitle,fontWeight:600,margin:"3px 0 0"}}>{day.titleKey?t(day.titleKey):day.title}</p>
+                {day.type==="workout"&&day.exercises&&<p style={{color:"#777",fontSize:SZ.sm,margin:"2px 0 0"}}>{day.exercises.length} {t("exercises_n")}{v>0?` · ${(v/1000).toFixed(1)}t`:""}</p>}
+              </div>
+              {p!==null&&<p style={{color:p===100?"#00d2ff":p>0?"#ffd43b":"#555",fontSize:SZ.lg,fontWeight:700,margin:0,fontFamily:Mo,flexShrink:0}}>{p}%</p>}
+              <div style={{color:"#555",fontSize:SZ.lg,flexShrink:0}}>›</div>
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Reminders */}
+      {(() => {
+        const dk = `${week}`;
+        const dis = dismissed[dk] || [];
+        const dismiss = (id) => {
+          const next = { ...dismissed, [dk]: [...dis, id] };
+          setDismissed(next); sd("dismissed", next);
+        };
+        const allRem = [];
+        if (garmin.filter(g=>g.week===week).length===0) allRem.push({id:"garmin",icon:"⌚",text:t("rem_watch"),color:"#748ffc",action:()=>setView("garmin")});
+        if (!prog.find(p=>p.week===week)) allRem.push({id:"progress",icon:"⚖️",text:t("rem_prog"),color:"#ffd43b",action:()=>setView("progress")});
+        const inc = program.filter((d,i) => d.type==="workout"&&dayProg(i)!==null&&dayProg(i)<100).length;
+        if (inc>0) allRem.push({id:"workouts",icon:"🏋️",text:`${inc} ${t("rem_work")}`,color:"#00d2ff"});
+        if (climb.filter(c=>c.week===week).length===0) allRem.push({id:"climb",icon:"🧗",text:t("rem_climb"),color:"#51cf66",action:()=>{setView("outdoor");setOutTab("climb")}});
+        if (hikes.filter(h=>h.week===week).length===0) allRem.push({id:"hike",icon:"🥾",text:t("rem_hike"),color:"#20c997",action:()=>{setView("outdoor");setOutTab("hike")}});
+        if (runs.filter(r=>r.week===week).length===0) allRem.push({id:"run",icon:"🏃",text:t("no_runs")+" W"+week,color:"#339af0",action:()=>{setView("outdoor");setOutTab("run")}});
+        if (yogas.filter(y=>y.week===week).length===0) allRem.push({id:"yoga",icon:"🧘",text:t("no_yoga")+" W"+week,color:"#cc5de8",action:()=>{setView("outdoor");setOutTab("yoga")}});
+        
+        const rem = allRem.filter(r => !dis.includes(r.id));
+        if (rem.length === 0) return null;
+        return (
+          <div style={{marginTop:14,background:"linear-gradient(135deg,#111118,#151520)",borderRadius:16,padding:"14px 16px",border:"1px solid #1a1a25"}}>
+            <p style={{color:"#999",fontSize:SZ.sm,letterSpacing:2,margin:"0 0 10px",fontWeight:600}}>📋 {t("reminders")} ({rem.length})</p>
+            {rem.map((r) => (
+              <div key={r.id} style={{display:"flex",alignItems:"center",gap:10,padding:"10px 12px",background:"rgba(255,255,255,0.02)",borderRadius:11,border:"1px solid #1a1a25",marginBottom:6}}>
+                <span style={{fontSize:SZ.icon}}>{r.icon}</span>
+                <p onClick={r.action||(()=>{})} style={{color:r.color,fontSize:SZ.cardSub,fontWeight:500,margin:0,flex:1,cursor:r.action?"pointer":"default"}}>{r.text}{r.action?" →":""}</p>
+                <button onClick={(e)=>{e.stopPropagation();dismiss(r.id)}} style={{width:30,height:30,borderRadius:8,border:"none",background:"rgba(255,255,255,0.05)",color:"#555",fontSize:SZ.sm,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>✕</button>
+              </div>
+            ))}
+          </div>
+        );
+      })()}
+
+      <div style={{display:"flex",gap:8,marginTop:16}}>
+        <button onClick={() => setShowTimer(true)} style={{flex:1,padding:"14px",borderRadius:14,border:"1px solid #222",background:"#111118",color:"#00d2ff",fontSize:SZ.md,fontWeight:600,cursor:"pointer"}}>⏱ Timer</button>
+        <button onClick={() => setView("progress")} style={{flex:1,padding:"14px",borderRadius:14,border:"1px solid #222",background:"#111118",color:"#ffd43b",fontSize:SZ.md,fontWeight:600,cursor:"pointer"}}>⚖️ Progress</button>
+      </div>
+    </div>
+  );
+
+  /* ═══ DAY VIEW ═══ */
+  const renderDay = () => {
+    const day = program[selDay]; const v = dayVol(week,selDay);
+    const dayPWO = postWO.filter(p=>p.week===week&&p.day===selDay).slice(-1)[0];
+    return (
+      <div style={{padding:"0 16px"}}>
+        <div style={{display:"flex",alignItems:"center",padding:"16px 0",paddingTop:"calc(16px + env(safe-area-inset-top, 0px))",gap:10}}>
+          <button onClick={() => setView("home")} style={{width:40,height:40,borderRadius:12,border:"1px solid #222",background:"#111",color:"#888",fontSize:SZ.lg,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}>‹</button>
+          <div style={{flex:1}}>
+            <p style={{color:"#999",fontSize:SZ.sm,letterSpacing:1,margin:0}}>{getDN()[selDay]} – W{week}</p>
+            <h2 style={{color:"#fff",fontSize:SZ.xl,fontWeight:700,margin:"2px 0 0"}}>{day.icon} {day.titleKey?t(day.titleKey):day.title}</h2>
+          </div>
+          {day.type==="workout"&&<>
+            {v>0&&<span style={{color:"#777",fontSize:SZ.sm,fontFamily:Mo}}>{(v/1000).toFixed(1)}t</span>}
+            <button onClick={() => setShowTimer(true)} style={{width:42,height:42,borderRadius:12,border:"1px solid rgba(0,210,255,0.3)",background:"rgba(0,210,255,0.07)",color:"#00d2ff",fontSize:SZ.lg,cursor:"pointer"}}>⏱</button>
+          </>}
+        </div>
+
+        {latestGM&&day.type==="workout"&&(
+          <div style={{display:"flex",gap:7,marginBottom:12}}>
+            {[{l:"Ready",v:latestGM.readiness,c:rcol(Number(latestGM.readiness)||0)},{l:"Battery",v:latestGM.battery,c:bcol(Number(latestGM.battery)||0)},{l:"Sleep",v:latestGM.sleep,c:scol(Number(latestGM.sleep)||0)},{l:"Recov.",v:`${latestGM.recovery||"–"}h`,c:"#748ffc"}].map(x=>
+              <div key={x.l} style={{flex:1,background:"#111118",borderRadius:10,padding:"8px 5px",textAlign:"center",border:"1px solid #1a1a25"}}>
+                <p style={{color:"#777",fontSize:SZ.xs,letterSpacing:1,margin:0}}>{x.l}</p>
+                <p style={{color:x.c,fontSize:SZ.cardTitle,fontWeight:700,margin:"2px 0 0",fontFamily:Mo}}>{x.v||"–"}</p>
+              </div>
+            )}
+          </div>
+        )}
+
+        {day.type==="workout"&&<div style={{display:"flex",gap:8,marginBottom:10}}>
+          <button onClick={() => completeDay(selDay)} style={{flex:1,padding:"11px",borderRadius:10,border:"1px solid rgba(0,210,255,0.2)",background:"rgba(0,210,255,0.05)",color:"#00d2ff",fontSize:SZ.sm,fontWeight:600,cursor:"pointer"}}>{t("complete_all")}</button>
+        </div>}
+
+        {day.type==="workout"&&day.exercises&&day.exercises.map((ex,ei) => {
+          const isO = ae===`${selDay}-${ei}`;
+          const allDone = Array.from({length:ex.sets},(_,s) => cs[gsk(selDay,ei,s)]).every(Boolean);
+          const best = e1rm(Math.max(...Array.from({length:ex.sets},(_,s)=>Number(wd[gdk(selDay,ei,s,"w")])||0)),Math.max(...Array.from({length:ex.sets},(_,s)=>Number(wd[gdk(selDay,ei,s,"r")])||0)));
+          return (
+            <div key={ei} style={{background:allDone?"rgba(0,210,255,0.03)":"#111118",borderRadius:14,padding:"14px 16px",marginBottom:9,border:allDone?"1px solid rgba(0,210,255,0.15)":"1px solid #1a1a25"}}>
+              <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",cursor:"pointer",marginBottom:isO?10:0}}>
+                <div onClick={() => setAe(isO?null:`${selDay}-${ei}`)} style={{display:"flex",alignItems:"center",gap:10,flex:1}}>
+                  <div style={{width:5,height:28,borderRadius:3,background:MC[ex.muscle]||"#999"}}/>
+                  <div>
+                    <p style={{color:allDone?"#aaa":"#eee",fontSize:SZ.md,fontWeight:600,margin:0,textDecoration:allDone?"line-through":"none"}}>{ex.name}</p>
+                    <p style={{color:"#999",fontSize:SZ.sm,margin:"2px 0 0"}}>{ex.sets}×{ex.reps}{best>0?` · 1RM≈${best}`:""}</p>
+                  </div>
+                </div>
+                {!allDone && <button onClick={(e) => {e.stopPropagation();completeEx(selDay,ei)}} style={{padding:"5px 10px",borderRadius:7,border:"none",background:"rgba(0,210,255,0.1)",color:"#00d2ff",fontSize:SZ.xs,fontWeight:600,cursor:"pointer",flexShrink:0}}>✓ All</button>}
+                <span onClick={() => setAe(isO?null:`${selDay}-${ei}`)} style={{color:"#555",fontSize:SZ.md,transform:isO?"rotate(90deg)":"none",transition:"transform 0.2s",cursor:"pointer",padding:"4px"}}>›</span>
+              </div>
+              <div style={{display:"flex",flexDirection:"column",gap:5}}>
+                {Array.from({length:ex.sets},(_,si) => {
+                  const sk=gsk(selDay,ei,si), done=cs[sk], wk=gdk(selDay,ei,si,"w"), rk=gdk(selDay,ei,si,"r"), rpek=gdk(selDay,ei,si,"rpe");
+                  const pw=wd[pvk(selDay,ei,si,"w")], pr=wd[pvk(selDay,ei,si,"r")];
+                  const cw=Number(wd[wk])||0, cr=Number(wd[rk])||0, isPR=cw>0&&pw&&cw>Number(pw);
+                  return (
+                    <div key={si} style={{display:"flex",alignItems:"center",gap:6,padding:isO?"9px 10px":"5px 10px",background:done?"rgba(0,210,255,0.04)":"rgba(255,255,255,0.015)",borderRadius:9}}>
+                      <button onClick={() => {tog(selDay,ei,si);if(!done&&cw>0)detectPR(ex.name,cw,cr)}}
+                        style={{width:30,height:30,borderRadius:8,border:"none",flexShrink:0,background:done?"#00d2ff":"#222",color:done?"#000":"#999",fontSize:SZ.sm,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",fontWeight:700,minWidth:30}}>
+                        {done?"✓":si+1}
+                      </button>
+                      {isO?(
+                        <div style={{flex:1,display:"flex",gap:6,alignItems:"flex-end"}}>
+                          <div style={{flex:1}}>
+                            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                              <label style={{color:"#999",fontSize:SZ.xs}}>KG</label>
+                              {pw&&<span style={{fontSize:SZ.xs,fontFamily:Mo,padding:"1px 5px",borderRadius:4,background:cw>+pw?"rgba(81,207,102,0.12)":cw<+pw?"rgba(255,71,87,0.12)":"rgba(255,255,255,0.05)",color:cw>+pw?"#51cf66":cw<+pw?"#ff4757":"#777"}}>{cw>+pw?"↑":cw<+pw?"↓":"="}{cw&&pw?Math.abs(cw-+pw):""} prev:{pw}</span>}
+                            </div>
+                            <input type="number" inputMode="decimal" placeholder="–" value={wd[wk]||""} onChange={e=>uwd(wk,e.target.value)} style={{width:"100%",padding:"6px 8px",borderRadius:8,border:isPR?"1px solid #ffd43b":"1px solid #222",background:isPR?"rgba(255,212,59,0.04)":"#0a0a14",color:"#fff",fontSize:SZ.input,fontFamily:Mo,outline:"none",boxSizing:"border-box"}}/>
+                          </div>
+                          <div style={{flex:1}}>
+                            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                              <label style={{color:"#999",fontSize:SZ.xs}}>REPS</label>
+                              {pr&&<span style={{fontSize:SZ.xs,fontFamily:Mo,padding:"1px 5px",borderRadius:4,background:"rgba(255,255,255,0.05)",color:"#777"}}>prev:{pr}</span>}
+                            </div>
+                            <input type="number" inputMode="numeric" placeholder={ex.reps} value={wd[rk]||""} onChange={e=>uwd(rk,e.target.value)} style={{width:"100%",padding:"6px 8px",borderRadius:8,border:"1px solid #222",background:"#0a0a14",color:"#fff",fontSize:SZ.input,fontFamily:Mo,outline:"none",boxSizing:"border-box"}}/>
+                          </div>
+                          <div style={{width:52}}>
+                            <label style={{color:"#999",fontSize:SZ.xs}}>RPE</label>
+                            <select value={wd[rpek]||""} onChange={e=>uwd(rpek,e.target.value)} style={{width:"100%",padding:"6px 2px",borderRadius:8,border:"1px solid #222",background:"#0a0a14",color:wd[rpek]?"#ffa94d":"#555",fontSize:SZ.sm,fontFamily:Mo,outline:"none"}}>
+                              <option value="">–</option>{[6,7,8,9,10].map(v=><option key={v} value={v}>{v}</option>)}
+                            </select>
+                          </div>
+                          {isPR&&<span style={{fontSize:SZ.md}}>🏆</span>}
+                        </div>
+                      ):(
+                        <div style={{flex:1,display:"flex",justifyContent:"space-between"}}>
+                          <span style={{color:"#999",fontSize:SZ.cardSub,fontFamily:Mo}}>Set {si+1}</span>
+                          <span style={{color:done?"#00d2ff":"#555",fontSize:SZ.cardSub,fontFamily:Mo}}>{wd[wk]?`${wd[wk]}kg×${wd[rk]||"?"}${wd[rpek]?` @${wd[rpek]}`:""}`:("–")}</span>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+              {isO&&<input type="text" placeholder={t("notes")} value={wd[`${week}-${selDay}-${ei}-note`]||""} onChange={e=>uwd(`${week}-${selDay}-${ei}-note`,e.target.value)} style={{width:"100%",padding:"8px 10px",borderRadius:8,border:"1px solid #1a1a25",background:"#0a0a14",color:"#999",fontSize:SZ.sm,outline:"none",boxSizing:"border-box",marginTop:7}}/>}
+            </div>
+          );
+        })}
+
+        {day.type==="workout"&&<button onClick={() => setAddEx(addEx===selDay?null:selDay)} style={{width:"100%",padding:"13px",borderRadius:13,border:"1px dashed #333",background:addEx===selDay?"rgba(0,210,255,0.05)":"none",color:"#999",fontSize:SZ.cardSub,fontWeight:600,cursor:"pointer",marginBottom:8}}>{addEx===selDay?"Cancel":"+ Add exercise"}</button>}
+        {addEx===selDay&&<AddExForm onSave={(ex) => {addExercise(selDay,ex);setAddEx(null)}}/>}
+
+        {day.type==="workout"&&<PostWOCard pwo={dayPWO} onSave={(e) => svPostWO({...e,day:selDay})}/>}
+
+        {day.type==="rest"&&day.activities&&day.activities.map((a,i) => {
+          const rk=`${week}-${selDay}-rest-${i}`; const done=cs[rk];
+          return (
+            <div key={i} style={{background:done?"rgba(81,207,102,0.05)":"#111118",borderRadius:14,padding:"16px 18px",marginBottom:9,border:done?"1px solid rgba(81,207,102,0.25)":"1px solid #1a1a25",display:"flex",alignItems:"center",gap:14}}>
+              <button onClick={() => {const n={...cs,[rk]:!done};setCs(n);sd("cs",n)}} style={{width:38,height:38,borderRadius:10,border:"none",flexShrink:0,background:done?"#51cf66":"#222",color:done?"#000":"#999",fontSize:SZ.md,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",fontWeight:700,minWidth:38}}>{done?"✓":"○"}</button>
+              <div style={{flex:1}}>
+                <p style={{color:done?"#aaa":"#eee",fontSize:SZ.md,fontWeight:600,margin:0,textDecoration:done?"line-through":"none"}}>{a.name}</p>
+                <p style={{color:"#51cf66",fontSize:SZ.cardSub,margin:"4px 0 0"}}>⏱ {a.duration}</p>
+                {a.note&&<p style={{color:"#999",fontSize:SZ.sm,margin:"3px 0 0"}}>{a.note}</p>}
+              </div>
+            </div>
+          );
+        })}
+
+        {day.type==="fullrest"&&(() => {
+          const rk=`${week}-${selDay}-fullrest`; const done=cs[rk];
+          return (
+            <div style={{background:done?"rgba(81,207,102,0.05)":"#111118",borderRadius:14,padding:"30px 18px",border:done?"1px solid rgba(81,207,102,0.25)":"1px solid #1a1a25",textAlign:"center"}}>
+              <div style={{fontSize:52,marginBottom:10}}>😴</div>
+              <p style={{color:"#eee",fontSize:SZ.cardTitle,fontWeight:600,margin:"0 0 16px"}}>{day.note}</p>
+              <button onClick={() => {const n={...cs,[rk]:!done};setCs(n);sd("cs",n)}} style={{padding:"13px 34px",borderRadius:12,border:"none",background:done?"#51cf66":"#222",color:done?"#000":"#aaa",fontSize:SZ.btn,fontWeight:700,cursor:"pointer"}}>{done?"✓ Completed":"Mark as done"}</button>
+            </div>
+          );
+        })()}
+      </div>
+    );
+  };
+
+  /* ═══ OUTDOOR ═══ */
+  const renderOutdoor = () => (
+    <div style={{padding:"0 16px"}}>
+      <h2 style={{color:"#fff",fontSize:SZ.xl,fontWeight:700,padding:"20px 0 6px",paddingTop:"calc(20px + env(safe-area-inset-top, 0px))",margin:0}}>🏔️ {t("nav_outdoor")}</h2>
+      <div style={{display:"flex",gap:6,margin:"8px 0 16px"}}>
+        {[["climb","🧗 "+t("climb")],["hike","🥾 "+t("hike")],["run","🏃 "+t("run")],["yoga","🧘 "+t("yoga")],["finger","🤏 "+t("fingers")]].map(([id,l]) => (
+          <button key={id} onClick={() => setOutTab(id)} style={{padding:"8px 14px",borderRadius:10,border:"none",fontSize:SZ.sm,fontWeight:600,background:outTab===id?"#51cf66":"#151520",color:outTab===id?"#000":"#999",cursor:"pointer"}}>{l}</button>
+        ))}
+      </div>
+      {outTab==="climb"&&<ClimbLog climb={climb} week={week} onSave={svClimb} onDel={delClimb} onUpd={updClimb}/>}
+      {outTab==="hike"&&<HikeLog hikes={hikes} week={week} onSave={svHike} onDel={delHike} onUpd={updHike}/>}
+      {outTab==="finger"&&<FingerLog finger={finger} week={week} onSave={svFinger} onDel={delFinger} onUpd={updFinger}/>}
+      {outTab==="run"&&<RunLog runs={runs} week={week} onSave={svRun} onDel={delRun} onUpd={updRun}/>}
+      {outTab==="yoga"&&<YogaLog yogas={yogas} week={week} onSave={svYoga} onDel={delYoga} onUpd={updYoga}/>}
+      {outTab==="pyramid"&&<div><p style={{color:"#999",fontSize:SZ.sm,letterSpacing:2,margin:"0 0 10px"}}>🧗 {t("pyramid")}</p>
+        {BG.slice().reverse().map(g => {const cnt=climb.filter(c=>c.grade===g&&(c.status==="flash"||c.status==="redpoint")).length;
+          return (<div key={g} style={{display:"flex",alignItems:"center",gap:8,marginBottom:4}}>
+            <span style={{color:"#aaa",fontSize:SZ.sm,width:28,textAlign:"right",fontFamily:Mo}}>{g}</span>
+            <div style={{flex:1,height:22,background:"#151520",borderRadius:4,overflow:"hidden"}}><div style={{width:`${Math.min(cnt*20,100)}%`,height:"100%",background:`hsl(${BG.indexOf(g)*25},70%,50%)`,borderRadius:4}}/></div>
+            <span style={{color:"#999",fontSize:SZ.sm,width:20,fontFamily:Mo}}>{cnt}</span>
+          </div>);
+        })}
+      </div>}
+    </div>
+  );
+
+  /* ═══ ANALYTICS ═══ */
+  const renderDash = () => {
+    const rangeWeeks = dateRange === "1w" ? 1 : dateRange === "1m" ? 4 : dateRange === "3m" ? 12 : 999;
+    const minW = Math.max(1, week - rangeWeeks + 1);
+    const inRange = (w) => (+(w) || 0) >= minW;
+    const readData = garmin.filter(g => g.readiness && inRange(g.week)).map(g => ({name:`W${g.week}`,readiness:+(g.readiness)||0,battery:+(g.battery)||0,sleep:+(g.sleep)||0}));
+    const volData = Array.from({length:week},(_,i) => ({name:`W${i+1}`,vol:Math.round(weekVol(i+1)/1000)})).filter(d => +(d.name.slice(1)) >= minW);
+    const liftData = prog.filter(p => (p.bench || p.squat || p.deadlift) && inRange(p.week||p.wk)).map(p => ({name:`W${p.week||p.wk}`,bench:+(p.bench)||0,squat:+(p.squat)||0,deadlift:+(p.deadlift)||0}));
+    const weightData = prog.filter(p => p.bodyWeight && inRange(p.week||p.wk)).map(p => ({name:`W${p.week||p.wk}`,kg:+(p.bodyWeight)||0}));
+    const bodyData = prog.filter(p => p.waist || p.chest || p.arms).map(p => ({name:`W${p.week||p.wk}`,waist:+(p.waist)||0,chest:+(p.chest)||0,arms:+(p.arms)||0}));
+    const bfData = prog.filter(p => p.bodyFat).map(p => ({name:`W${p.week||p.wk}`,bf:+(p.bodyFat)||0}));
+    const totalVol = Array.from({length:week},(_,i) => weekVol(i+1)).reduce((a,b) => a+b, 0);
+    const totalClimbs = climb.filter(c => c.type !== "session" && (c.status==="flash"||c.status==="redpoint")).length;
+    const hasData = prog.length > 0 || garmin.length > 0 || prs.length > 0 || climb.length > 0;
+
+    return (
+      <div style={{padding:"0 16px"}} className="st">
+        <h2 style={{color:"#fff",fontSize:SZ.xl,fontWeight:700,padding:"20px 0 6px",margin:0}}>📊 {t("nav_analytics")}</h2>
+
+        {/* Summary Cards */}
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8,marginBottom:14}}>
+          {[
+            {label:"Volume",value:totalVol > 0 ? `${(totalVol/1000).toFixed(1)}t` : "--",icon:"🏋️",color:"#00d2ff",act:()=>setDashTab("strength")},
+            {label:"PRs",value:prs.length || "--",icon:"🏆",color:"#ffd43b",act:()=>setDashTab("prs")},
+            {label:t("climb"),value:totalClimbs || "--",icon:"🧗",color:"#51cf66",act:()=>{setView("outdoor");setOutTab("climb")}},
+            {label:t("hike"),value:hikes.length || "--",icon:"🥾",color:"#20c997",act:()=>{setView("outdoor");setOutTab("hike")}},
+            {label:t("run"),value:runs.length || "--",icon:"🏃",color:"#339af0",act:()=>{setView("outdoor");setOutTab("run")}},
+            {label:t("yoga"),value:yogas.length || "--",icon:"🧘",color:"#cc5de8",act:()=>{setView("outdoor");setOutTab("yoga")}},
+          ].map((s, idx) => (
+            <div key={s.label} style={{background:"linear-gradient(135deg,#111118,#151520)",borderRadius:14,padding:"12px 14px",border:"1px solid #1a1a25",display:"flex",alignItems:"center",gap:10,animation:`fadeUp 0.4s ease-out ${idx*0.1}s both`,cursor:"pointer"}}
+              onClick={s.act}>
+              <span style={{fontSize:24}}>{s.icon}</span>
+              <div>
+                <p style={{color:s.color,fontSize:SZ.lg,fontWeight:700,margin:0,fontFamily:Mo}}>{s.value}</p>
+                <p style={{color:"#777",fontSize:9,margin:"1px 0 0"}}>{s.label}</p>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {/* Tabs */}
+        <div style={{display:"flex",gap:5,margin:"0 0 14px",overflowX:"auto",paddingBottom:3}}>
+          {[["body",t("tab_body")],["strength",t("tab_strength")],["recovery",t("tab_recovery")],["prs",t("tab_prs")]].map(([id,l]) => (
+            <button key={id} onClick={() => setDashTab(id)} style={{padding:"9px 16px",borderRadius:11,border:"none",fontSize:SZ.sm,fontWeight:600,background:dashTab===id?"#00d2ff":"#151520",color:dashTab===id?"#000":"#999",cursor:"pointer",flexShrink:0}}>{l}</button>
+          ))}
+        </div>
+
+        {/* Date Range */}
+        <div style={{display:"flex",gap:4,marginBottom:14}}>
+          {[["1w","1W",1],["1m","1M",4],["3m","3M",12],["all","All",999]].map(([id,l,w]) => (
+            <button key={id} onClick={() => setDateRange(id)} style={{padding:"6px 12px",borderRadius:8,border:"none",fontSize:SZ.xs,fontWeight:600,background:dateRange===id?"rgba(0,210,255,0.15)":"#0a0a14",color:dateRange===id?"#00d2ff":"#777",cursor:"pointer"}}>{l}</button>
+          ))}
+        </div>
+
+        {!hasData && (
+          <div style={{textAlign:"center",padding:"40px 20px"}}>
+            <p style={{fontSize:44,margin:"0 0 12px"}}>📊</p>
+            <p style={{color:"#999",fontSize:SZ.md,margin:"0 0 6px"}}>{t("no_data")}</p>
+            <p style={{color:"#555",fontSize:SZ.sm}}>Start tracking workouts and add weekly progress to see analytics.</p>
+          </div>
+        )}
+
+        {/* BODY TAB */}
+        {dashTab==="body" && hasData && (<div>
+          {weightData.length > 0 ? (
+            <CC t={t("weight_trend")} c="#ffd43b">
+              <SLine data={weightData} lines={[{key:"kg",color:"#ffd43b"}]} h={140}/>
+              {weightData.length >= 2 && (() => {
+                const first = weightData[0].kg, last = weightData[weightData.length-1].kg;
+                const diff = (last - first).toFixed(1);
+                return (
+                  <div style={{display:"flex",justifyContent:"space-between",padding:"8px 12px 0"}}>
+                    <span style={{color:"#777",fontSize:SZ.xs}}>Start: {first} kg</span>
+                    <span style={{color:diff > 0 ? "#51cf66" : "#ff6b6b",fontSize:SZ.sm,fontWeight:600}}>{diff > 0 ? "+" : ""}{diff} kg</span>
+                    <span style={{color:"#ffd43b",fontSize:SZ.xs}}>Now: {last} kg</span>
+                  </div>
+                );
+              })()}
+            </CC>
+          ) : (
+            <div style={{textAlign:"center",padding:"30px 20px"}}>
+              <p style={{color:"#555",fontSize:SZ.sm}}>{t("add_progress")}</p>
+              <button onClick={() => setView("progress")} style={{marginTop:10,padding:"10px 20px",borderRadius:10,border:"1px solid #ffd43b",background:"none",color:"#ffd43b",fontSize:SZ.sm,fontWeight:600,cursor:"pointer"}}>+ Add progress</button>
+            </div>
+          )}
+          {bodyData.length > 0 && (
+            <CC t={t("measurements")} c="#20c997">
+              <SLine data={bodyData} lines={[{key:"chest",color:"#ff6b6b"},{key:"arms",color:"#339af0"},{key:"waist",color:"#ffa94d"}]} h={140}/>
+              <div style={{display:"flex",gap:12,justifyContent:"center",marginTop:6}}>
+                {[["Chest","#ff6b6b"],["Arms","#339af0"],["Waist","#ffa94d"]].map(([l,c]) => (
+                  <span key={l} style={{color:c,fontSize:SZ.xs}}>● {l}</span>
+                ))}
+              </div>
+            </CC>
+          )}
+          {bfData.length > 0 && (
+            <CC t={t("body_fat")} c="#cc5de8">
+              <SLine data={bfData} lines={[{key:"bf",color:"#cc5de8"}]} h={120}/>
+            </CC>
+          )}
+        </div>)}
+
+        {/* STRENGTH TAB */}
+        {dashTab==="strength" && hasData && (<div>
+          {liftData.length > 0 ? (<>
+            <CC t={t("lift_prog")} c="#ff6b6b">
+              <SLine data={liftData} lines={[{key:"bench",color:"#ff6b6b"},{key:"squat",color:"#cc5de8"},{key:"deadlift",color:"#51cf66"}]} h={160}/>
+              <div style={{display:"flex",gap:12,justifyContent:"center",marginTop:6}}>
+                {[["Bench","#ff6b6b"],["Squat","#cc5de8"],["Deadlift","#51cf66"]].map(([l,c]) => (
+                  <span key={l} style={{color:c,fontSize:SZ.xs}}>● {l}</span>
+                ))}
+              </div>
+              {liftData.length >= 2 && (
+                <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:6,marginTop:10,padding:"0 4px"}}>
+                  {[{k:"bench",l:"Bench",c:"#ff6b6b"},{k:"squat",l:"Squat",c:"#cc5de8"},{k:"deadlift",l:"Deadlift",c:"#51cf66"}].map(x => {
+                    const first = liftData[0][x.k], last = liftData[liftData.length-1][x.k], diff = last - first;
+                    return (
+                      <div key={x.k} style={{background:"#0a0a14",borderRadius:8,padding:"8px",textAlign:"center"}}>
+                        <p style={{color:"#777",fontSize:9,margin:0}}>{x.l}</p>
+                        <p style={{color:x.c,fontSize:SZ.lg,fontWeight:700,margin:"2px 0 0",fontFamily:Mo}}>{last || "--"}</p>
+                        {diff !== 0 && <p style={{color:diff > 0 ? "#51cf66" : "#ff4757",fontSize:SZ.xs,margin:"2px 0 0"}}>{diff > 0 ? "+" : ""}{diff}kg</p>}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </CC>
+          </>) : (
+            <div style={{textAlign:"center",padding:"30px 20px"}}>
+              <p style={{color:"#555",fontSize:SZ.sm}}>{t("add_progress")}</p>
+            </div>
+          )}
+          <CC t={t("vol_tons")} c="#00d2ff">
+            <SBar data={volData} dk="vol" fill="#00d2ff" h={130}/>
+            {totalVol > 0 && <p style={{color:"#777",fontSize:SZ.xs,textAlign:"center",marginTop:6}}>{(totalVol/1000).toFixed(1)}t · {week} {t("week_n").toLowerCase()}</p>}
+          </CC>
+        </div>)}
+
+        {/* RECOVERY TAB */}
+        {dashTab==="recovery" && hasData && (<div>
+          {readData.length > 0 ? (<>
+            <CC t={t("readiness_trend")} c="#51cf66">
+              <SLine data={readData} lines={[{key:"readiness",color:"#51cf66"},{key:"battery",color:"#00d2ff"},{key:"sleep",color:"#748ffc"}]} h={160}/>
+              <div style={{display:"flex",gap:12,justifyContent:"center",marginTop:6}}>
+                {[["Readiness","#51cf66"],["Battery","#00d2ff"],["Sleep","#748ffc"]].map(([l,c]) => (
+                  <span key={l} style={{color:c,fontSize:SZ.xs}}>● {l}</span>
+                ))}
+              </div>
+            </CC>
+            {garmin.length > 0 && (() => {
+              const avgR = Math.round(garmin.filter(g => g.readiness).reduce((a,g) => a + (+(g.readiness)||0), 0) / Math.max(garmin.filter(g => g.readiness).length, 1));
+              const avgS = Math.round(garmin.filter(g => g.sleep).reduce((a,g) => a + (+(g.sleep)||0), 0) / Math.max(garmin.filter(g => g.sleep).length, 1));
+              return (
+                <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8,marginBottom:10}}>
+                  {[{l:"Avg Ready",v:avgR,c:rcol(avgR)},{l:"Avg Sleep",v:avgS,c:scol(avgS)},{l:"Entries",v:garmin.length,c:"#748ffc"}].map(s => (
+                    <div key={s.l} style={{background:"#111118",borderRadius:10,padding:"10px",textAlign:"center",border:"1px solid #1a1a25"}}>
+                      <p style={{color:"#777",fontSize:9,letterSpacing:1,margin:0}}>{s.l}</p>
+                      <p style={{color:s.c,fontSize:SZ.xl,fontWeight:700,margin:"4px 0 0",fontFamily:Mo}}>{s.v}</p>
+                    </div>
+                  ))}
+                </div>
+              );
+            })()}
+          </>) : (
+            <div style={{textAlign:"center",padding:"30px 20px"}}>
+              <p style={{fontSize:44,margin:"0 0 12px"}}>⌚</p>
+              <p style={{color:"#555",fontSize:SZ.sm}}>{t("add_checkin")}</p>
+              <button onClick={() => setView("garmin")} style={{marginTop:10,padding:"10px 20px",borderRadius:10,border:"1px solid #748ffc",background:"none",color:"#748ffc",fontSize:SZ.sm,fontWeight:600,cursor:"pointer"}}>+ Add check-in</button>
+            </div>
+          )}
+        </div>)}
+
+        {/* PRs TAB */}
+        {dashTab==="prs" && (<div>
+          {prs.length === 0 ? (
+            <div style={{textAlign:"center",padding:"30px 20px"}}>
+              <p style={{fontSize:44,margin:"0 0 12px"}}>🏆</p>
+              <p style={{color:"#555",fontSize:SZ.sm}}>{t("no_data_desc")}</p>
+            </div>
+          ) : (<>
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:12}}>
+              <div style={{background:"linear-gradient(135deg,rgba(255,212,59,0.08),rgba(255,212,59,0.02))",borderRadius:12,padding:"14px",textAlign:"center",border:"1px solid rgba(255,212,59,0.15)"}}>
+                <p style={{color:"#777",fontSize:SZ.xs,margin:0}}>{t("total_prs")}</p>
+                <p style={{color:"#ffd43b",fontSize:SZ.xxl,fontWeight:700,margin:"4px 0 0",fontFamily:Mo}}>{prs.length}</p>
+              </div>
+              <div style={{background:"linear-gradient(135deg,rgba(255,107,107,0.08),rgba(255,107,107,0.02))",borderRadius:12,padding:"14px",textAlign:"center",border:"1px solid rgba(255,107,107,0.15)"}}>
+                <p style={{color:"#777",fontSize:SZ.xs,margin:0}}>{t("best_1rm")}</p>
+                <p style={{color:"#ff6b6b",fontSize:SZ.xxl,fontWeight:700,margin:"4px 0 0",fontFamily:Mo}}>{Math.max(...prs.map(p => p.e1rm))}</p>
+              </div>
+            </div>
+            {prs.sort((a,b) => b.e1rm - a.e1rm).map((p,i) => (
+              <div key={i} style={{background:"#111118",borderRadius:13,padding:"14px 16px",marginBottom:7,border:"1px solid rgba(255,212,59,0.12)",display:"flex",alignItems:"center",gap:12}}>
+                <span style={{fontSize:SZ.icon}}>{i===0 ? "🥇" : i===1 ? "🥈" : i===2 ? "🥉" : "🏆"}</span>
+                <div style={{flex:1}}>
+                  <p style={{color:"#eee",fontSize:SZ.md,fontWeight:600,margin:0}}>{p.exercise}</p>
+                  <p style={{color:"#999",fontSize:SZ.sm,margin:"2px 0 0"}}>W{p.week||p.wk} · {p.weight}kg x {p.reps}</p>
+                </div>
+                <div style={{textAlign:"right"}}>
+                  <p style={{color:"#ffd43b",fontSize:SZ.lg,fontWeight:700,margin:0,fontFamily:Mo}}>{p.e1rm}</p>
+                  <p style={{color:"#777",fontSize:SZ.xs,margin:0}}>est. 1RM</p>
+                </div>
+              </div>
+            ))}
+          </>)}
+        </div>)}
+      </div>
+    );
+  };
+
+  /* ═══ SETTINGS ═══ */
+  const saveProfile = () => {
+    sd("nm", name); sd("ht", height); sd("cw", curWeight); sd("gw", goalWeight); sd("age", age); sd("city", city);
+    setSaved(true); setTimeout(() => setSaved(false), 2000);
+    if (city) fetchWeather(city);
+  };
+
+  const bmiCalc = () => {
+    const h = Number(height), w = Number(curWeight);
+    if (h < 100 || !w || w <= 0) return null;
+    const hm = h / 100;
+    const val = w / (hm * hm);
+    if (!isFinite(val) || val <= 0 || val > 100) return null;
+    return val.toFixed(1);
+  };
+
+  const bmiInfo = (bmi) => {
+    const b = Number(bmi);
+    if (b < 18.5) return { cat: "Underweight", col: "#339af0" };
+    if (b < 25) return { cat: "Normal", col: "#51cf66" };
+    if (b < 30) return { cat: "Overweight", col: "#ffd43b" };
+    return { cat: "Obese", col: "#ff4757" };
+  };
+
+  const goalPct = () => {
+    const cw = Number(curWeight), gw = Number(goalWeight);
+    if (!cw || !gw || cw === gw) return null;
+    const start = gw > cw ? cw - (gw - cw) : cw + (cw - gw);
+    const pct = Math.min(100, Math.max(0, Math.round(((cw - start) / (gw - start)) * 100)));
+    return pct;
+  };
+
+  const renderSettings = () => {
+    const bmi = bmiCalc();
+    const bi = bmi ? bmiInfo(bmi) : null;
+    const gp = goalPct();
+
+    return (
+    <div style={{padding:"0 16px"}}>
+      <h2 style={{color:"#fff",fontSize:SZ.xl,fontWeight:700,padding:"20px 0 12px",paddingTop:"calc(20px + env(safe-area-inset-top, 0px))",margin:0}}>{`${t('settings')}`}</h2>
+
+      {/* ═══ PROFILE CARD ═══ */}
+      {!profEdit ? (
+        /* ─── VIEW MODE ─── */
+        <div style={{background:"linear-gradient(135deg,#111118,#151525)",borderRadius:16,padding:"20px",border:"1px solid #1a1a25",marginBottom:12}}>
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16}}>
+            <p style={{color:"#00d2ff",fontSize:SZ.sm,letterSpacing:2,margin:0,fontWeight:600}}>{t("profile")}</p>
+            <button onClick={() => setProfEdit(true)}
+              style={{padding:"8px 18px",borderRadius:9,border:"1px solid #222",background:"none",color:"#999",fontWeight:600,fontSize:SZ.sm,cursor:"pointer"}}>
+              ✏️ Edit
+            </button>
+          </div>
+
+          {/* Name + Age row */}
+          <div style={{display:"flex",alignItems:"baseline",gap:8,marginBottom:14}}>
+            <p style={{color:"#fff",fontSize:SZ.xxl,fontWeight:700,margin:0}}>{name || "No name"}</p>
+            {age && <p style={{color:"#777",fontSize:SZ.md,margin:0}}>{age} yrs</p>}
+          </div>
+
+          {/* Stats grid */}
+          <div style={{display:"grid",gridTemplateColumns:bmi?"1fr 1fr 1fr":"1fr 1fr",gap:8,marginBottom:curWeight&&goalWeight?14:0}}>
+            <div style={{background:"#0a0a14",borderRadius:12,padding:"12px 10px",textAlign:"center"}}>
+              <p style={{color:"#777",fontSize:10,letterSpacing:1,margin:0}}>HEIGHT</p>
+              <p style={{color:"#fff",fontSize:SZ.xl,fontWeight:700,margin:"4px 0 0",fontFamily:Mo}}>{height || "--"}</p>
+              <p style={{color:"#777",fontSize:SZ.xs,margin:0}}>cm</p>
+            </div>
+            <div style={{background:"#0a0a14",borderRadius:12,padding:"12px 10px",textAlign:"center"}}>
+              <p style={{color:"#777",fontSize:10,letterSpacing:1,margin:0}}>WEIGHT</p>
+              <p style={{color:"#ffd43b",fontSize:SZ.xl,fontWeight:700,margin:"4px 0 0",fontFamily:Mo}}>{curWeight || "--"}</p>
+              <p style={{color:"#777",fontSize:SZ.xs,margin:0}}>kg</p>
+            </div>
+            {bmi && bi && (
+              <div style={{background:"#0a0a14",borderRadius:12,padding:"12px 10px",textAlign:"center"}}>
+                <p style={{color:"#777",fontSize:10,letterSpacing:1,margin:0}}>BMI</p>
+                <p style={{color:bi.col,fontSize:SZ.xl,fontWeight:700,margin:"4px 0 0",fontFamily:Mo}}>{bmi}</p>
+                <p style={{color:bi.col,fontSize:SZ.xs,margin:0}}>{bi.cat}</p>
+              </div>
+            )}
+          </div>
+
+          {/* Goal progress */}
+          {curWeight && goalWeight && (
+            <div style={{background:"#0a0a14",borderRadius:12,padding:"14px 16px"}}>
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:6}}>
+                <p style={{color:"#999",fontSize:SZ.xs,letterSpacing:1,margin:0}}>GOAL</p>
+                <p style={{color:Number(curWeight)>=Number(goalWeight)?"#51cf66":"#ffa94d",fontSize:SZ.sm,fontWeight:600,margin:0}}>
+                  {Number(curWeight) >= Number(goalWeight) ? "✓ Reached!" : `${Math.abs(Number(goalWeight) - Number(curWeight)).toFixed(1)} kg to go`}
+                </p>
+              </div>
+              <div style={{display:"flex",alignItems:"center",gap:10}}>
+                <span style={{color:"#777",fontSize:SZ.sm,fontFamily:Mo}}>{curWeight}</span>
+                <div style={{flex:1,height:8,background:"#1a1a25",borderRadius:4,overflow:"hidden"}}>
+                  <div style={{width:`${gp !== null ? gp : 0}%`,height:"100%",background:gp>=100?"#51cf66":"linear-gradient(90deg,#ffa94d,#ffd43b)",borderRadius:4,transition:"width 0.5s"}}/>
+                </div>
+                <span style={{color:"#ffd43b",fontSize:SZ.sm,fontWeight:600,fontFamily:Mo}}>{goalWeight}</span>
+              </div>
+            </div>
+          )}
+        </div>
+      ) : (
+        /* ─── EDIT MODE ─── */
+        <div style={{background:"linear-gradient(135deg,#111118,#151525)",borderRadius:16,padding:"20px",border:"1px solid rgba(0,210,255,0.15)",marginBottom:12}}>
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:14}}>
+            <p style={{color:"#00d2ff",fontSize:SZ.sm,letterSpacing:2,margin:0,fontWeight:600}}>{t("edit_profile")}</p>
+            <div style={{display:"flex",gap:8}}>
+              {name && <button onClick={() => setProfEdit(false)}
+                style={{padding:"10px 16px",borderRadius:10,border:"1px solid #333",background:"none",color:"#999",fontWeight:600,fontSize:SZ.sm,cursor:"pointer"}}>
+                Cancel
+              </button>}
+              <button onClick={() => { saveProfile(); setProfEdit(false); }}
+                style={{padding:"10px 22px",borderRadius:10,border:"none",background:saved?"#51cf66":"#00d2ff",color:"#000",fontWeight:700,fontSize:SZ.md,cursor:"pointer",minWidth:80}}>
+                {saved ? "✓" : "Save"}
+              </button>
+            </div>
+          </div>
+
+          <div style={{marginBottom:12}}>
+            <label style={{color:"#999",fontSize:SZ.xs,letterSpacing:1}}>{t("name")}</label>
+            <input type="text" placeholder={t("name_ph")} value={name} onChange={e => setName(e.target.value)}
+              style={{width:"100%",padding:"12px 14px",borderRadius:10,border:"1px solid #222",background:"#0a0a14",color:"#fff",fontSize:SZ.md,outline:"none",boxSizing:"border-box",marginTop:4}}/>
+          </div>
+
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:12}}>
+            <div>
+              <label style={{color:"#999",fontSize:SZ.xs,letterSpacing:1}}>{t("age_lbl")}</label>
+              <input type="number" inputMode="numeric" placeholder="25" value={age} onChange={e => setAge(e.target.value)}
+                style={{width:"100%",padding:"12px",borderRadius:10,border:"1px solid #222",background:"#0a0a14",color:"#fff",fontSize:SZ.input,fontFamily:Mo,outline:"none",boxSizing:"border-box",marginTop:4}}/>
+            </div>
+            <div>
+              <label style={{color:"#999",fontSize:SZ.xs,letterSpacing:1}}>{t("height_lbl")}</label>
+              <input type="number" inputMode="numeric" placeholder="180" value={height} onChange={e => setHeight(e.target.value)}
+                style={{width:"100%",padding:"12px",borderRadius:10,border:"1px solid #222",background:"#0a0a14",color:"#fff",fontSize:SZ.input,fontFamily:Mo,outline:"none",boxSizing:"border-box",marginTop:4}}/>
+            </div>
+          </div>
+
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:6}}>
+            <div>
+              <label style={{color:"#999",fontSize:SZ.xs,letterSpacing:1}}>{t("cur_weight")}</label>
+              <input type="number" inputMode="decimal" placeholder="80" value={curWeight} onChange={e => setCurWeight(e.target.value)}
+                style={{width:"100%",padding:"12px",borderRadius:10,border:"1px solid #222",background:"#0a0a14",color:"#fff",fontSize:SZ.input,fontFamily:Mo,outline:"none",boxSizing:"border-box",marginTop:4}}/>
+            </div>
+            <div>
+              <label style={{color:"#999",fontSize:SZ.xs,letterSpacing:1}}>{t("goal_weight")}</label>
+              <input type="number" inputMode="decimal" placeholder="90" value={goalWeight} onChange={e => setGoalWeight(e.target.value)}
+                style={{width:"100%",padding:"12px",borderRadius:10,border:"1px solid #222",background:"#0a0a14",color:"#fff",fontSize:SZ.input,fontFamily:Mo,outline:"none",boxSizing:"border-box",marginTop:4}}/>
+            </div>
+          </div>
+
+          {/* City for weather */}
+          <div style={{marginTop:10}}>
+            <label style={{color:"#999",fontSize:SZ.xs,letterSpacing:1}}>{t("city_lbl")}</label>
+            <input type="text" placeholder={t("city_ph")} value={city} onChange={e => setCity(e.target.value)}
+              style={{width:"100%",padding:"12px 14px",borderRadius:10,border:"1px solid #222",background:"#0a0a14",color:"#fff",fontSize:SZ.md,outline:"none",boxSizing:"border-box",marginTop:4}}/>
+          </div>
+
+          {bmi && bi && (
+            <div style={{display:"flex",alignItems:"center",gap:8,marginTop:10,padding:"10px 14px",background:"#0a0a14",borderRadius:10}}>
+              <span style={{color:bi.col,fontSize:SZ.lg,fontWeight:700,fontFamily:Mo}}>{bmi}</span>
+              <span style={{color:bi.col,fontSize:SZ.sm}}>BMI · {bi.cat}</span>
+              <span style={{color:"#555",fontSize:SZ.xs,marginLeft:"auto",fontStyle:"italic"}}>Less accurate for muscular builds</span>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ═══ WEEK SELECTOR ═══ */}
+      <div style={{background:"#111118",borderRadius:14,padding:"18px",border:"1px solid #1a1a25",marginBottom:10}}>
+        <p style={{color:"#999",fontSize:SZ.xs,letterSpacing:2,margin:"0 0 8px"}}>{t("cur_week")}</p>
+        <div style={{display:"flex",gap:5,flexWrap:"wrap"}}>
+          {Array.from({length:12},(_,i)=>i+1).map(w => (
+            <button key={w} onClick={() => chW(w)} style={{width:42,height:38,borderRadius:10,border:"none",fontSize:SZ.md,fontWeight:600,background:w===week?"#00d2ff":"#1a1a25",color:w===week?"#000":"#999",cursor:"pointer"}}>{w}</button>
+          ))}
+        </div>
+      </div>
+
+      {/* ═══ PROGRAM EDITOR ═══ */}
+      <div style={{background:"#111118",borderRadius:14,padding:"18px",border:"1px solid #1a1a25",marginBottom:10}}>
+        <p style={{color:"#999",fontSize:SZ.xs,letterSpacing:2,margin:"0 0 8px"}}>{t("prog_editor")}</p>
+        <p style={{color:"#777",fontSize:SZ.sm,margin:"0 0 12px"}}>{t("prog_edit_desc")}</p>
+        {program.map((day, di) => {
+          if (day.type !== "workout") return null;
+          const isOpen = editDay === di;
+          return (
+            <div key={di} style={{marginBottom:8}}>
+              <button onClick={() => setEditDay(isOpen ? null : di)}
+                style={{width:"100%",padding:"13px 15px",borderRadius:11,border:"1px solid #1a1a25",background:isOpen?"rgba(0,210,255,0.05)":"#0a0a14",color:"#eee",fontSize:SZ.md,fontWeight:600,cursor:"pointer",textAlign:"left",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                <span>{day.icon} {day.titleKey?t(day.titleKey):day.title}</span>
+                <span style={{color:"#777",fontSize:SZ.sm}}>{day.exercises?.length || 0} ex {isOpen ? "▼" : "›"}</span>
+              </button>
+              {isOpen && (
+                <div style={{padding:"10px 0 0"}}>
+                  {day.exercises && day.exercises.map((ex, ei) => (
+                    <div key={ei} style={{display:"flex",alignItems:"center",gap:8,padding:"9px 10px",background:"#0a0a14",borderRadius:9,marginBottom:4}}>
+                      <div style={{width:4,height:22,borderRadius:2,background:MC[ex.muscle] || "#999"}}/>
+                      <div style={{flex:1}}>
+                        <p style={{color:"#ccc",fontSize:SZ.cardSub,margin:0}}>{ex.name}</p>
+                        <p style={{color:"#777",fontSize:SZ.xs,margin:"1px 0 0"}}>{ex.sets}x{ex.reps} · {ex.muscle}</p>
+                      </div>
+                      <button onClick={() => removeExercise(di, ei)}
+                        style={{width:30,height:30,borderRadius:8,border:"none",background:"rgba(255,71,87,0.1)",color:"#ff4757",fontSize:SZ.sm,cursor:"pointer"}}>✕</button>
+                    </div>
+                  ))}
+                  <AddExForm onSave={(ex) => addExercise(di, ex)} compact/>
+                </div>
+              )}
+            </div>
+          );
+        })}
+        <button onClick={() => { if (confirm(t("reset_confirm"))) { saveProgram(DEFAULT_PROGRAM); } }}
+          style={{width:"100%",padding:"11px",borderRadius:10,border:"1px solid #333",background:"none",color:"#999",fontSize:SZ.sm,fontWeight:600,cursor:"pointer",marginTop:8}}>
+          Reset to default program
+        </button>
+      </div>
+
+      {/* ═══ WATCH TYPE ═══ */}
+      <div style={{background:"#111118",borderRadius:14,padding:"18px",border:"1px solid #1a1a25",marginBottom:10}}>
+        <p style={{color:"#999",fontSize:SZ.xs,letterSpacing:2,margin:"0 0 10px"}}>{t("smartwatch")}</p>
+        <div style={{display:"flex",gap:5,flexWrap:"wrap"}}>
+          {Object.entries(WATCHES).map(([id, w]) => (
+            <button key={id} onClick={() => {setWatchType(id); sd("wt", id)}}
+              style={{padding:"9px 14px",borderRadius:10,border:"none",fontSize:SZ.sm,fontWeight:600,background:watchType===id?"#748ffc":"#1a1a25",color:watchType===id?"#000":"#999",cursor:"pointer"}}>
+              {w.icon} {w.name}
+            </button>
+          ))}
+        </div>
+        <p style={{color:"#777",fontSize:SZ.xs,margin:"8px 0 0"}}>{t("watch_desc")}</p>
+      </div>
+
+      {/* ═══ LANGUAGE ═══ */}
+      <div style={{background:"#111118",borderRadius:14,padding:"18px",border:"1px solid #1a1a25",marginBottom:10}}>
+        <p style={{color:"#999",fontSize:SZ.xs,letterSpacing:2,margin:"0 0 10px"}}>{t("language")}</p>
+        <div style={{display:"flex",gap:6}}>
+          {[["en","🇬🇧 English"],["hr","🇭🇷 Hrvatski"],["de","🇩🇪 Deutsch"]].map(([id,label]) => (
+            <button key={id} onClick={() => {setLang(id); sd("lang", id); LANG=id}}
+              style={{flex:1,padding:"10px",borderRadius:10,border:"none",fontSize:SZ.sm,fontWeight:600,background:lang===id?"#00d2ff":"#1a1a25",color:lang===id?"#000":"#999",cursor:"pointer"}}>
+              {label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* ═══ QUICK LINKS ═══ */}
+      <button onClick={() => setView("garmin")}
+        style={{width:"100%",padding:"15px",borderRadius:14,border:"1px solid rgba(116,143,252,0.3)",background:"rgba(116,143,252,0.05)",color:"#748ffc",fontSize:SZ.md,fontWeight:600,cursor:"pointer",marginBottom:10}}>
+        ⌚ {(WATCHES[watchType]||WATCHES.other).name} {t("checkin")}
+      </button>
+      <button onClick={() => setView("progress")}
+        style={{width:"100%",padding:"15px",borderRadius:14,border:"1px solid rgba(255,212,59,0.3)",background:"rgba(255,212,59,0.05)",color:"#ffd43b",fontSize:SZ.md,fontWeight:600,cursor:"pointer",marginBottom:10}}>
+        {t("weekly_prog")}
+      </button>
+
+      {/* ═══ DATA BACKUP ═══ */}
+      <div style={{background:"#111118",borderRadius:14,padding:"18px",border:"1px solid #1a1a25",marginBottom:10}}>
+        <p style={{color:"#999",fontSize:SZ.xs,letterSpacing:2,margin:"0 0 10px"}}>{t("backup")}</p>
+        <button onClick={() => {
+          const data = {};
+          for (let i = 0; i < localStorage.length; i++) {
+            const k = localStorage.key(i);
+            if (k.startsWith("gc_")) data[k] = localStorage.getItem(k);
+          }
+          const blob = new Blob([JSON.stringify(data, null, 2)], {type: "application/json"});
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement("a");
+          a.href = url; a.download = `gymclimb-backup-W${week}.json`;
+          a.click(); URL.revokeObjectURL(url);
+        }} style={{width:"100%",padding:"14px",borderRadius:12,border:"1px solid rgba(81,207,102,0.3)",background:"rgba(81,207,102,0.05)",color:"#51cf66",fontSize:SZ.md,fontWeight:600,cursor:"pointer",marginBottom:8}}>
+          {t("export_btn")}
+        </button>
+        <label style={{width:"100%",display:"block",padding:"14px",borderRadius:12,border:"1px solid rgba(0,210,255,0.3)",background:"rgba(0,210,255,0.05)",color:"#00d2ff",fontSize:SZ.md,fontWeight:600,cursor:"pointer",textAlign:"center"}}>
+          {t("import_btn")}
+          <input type="file" accept=".json" style={{display:"none"}} onChange={(e) => {
+            const file = e.target.files[0]; if (!file) return;
+            const reader = new FileReader();
+            reader.onload = (ev) => {
+              try {
+                const data = JSON.parse(ev.target.result);
+                if (confirm(`Import ${Object.keys(data).length} data entries? This will overwrite current data.`)) {
+                  Object.entries(data).forEach(([k, v]) => localStorage.setItem(k, v));
+                  location.reload();
+                }
+              } catch (err) { alert("Invalid file format"); }
+            };
+            reader.readAsText(file);
+          }} />
+        </label>
+        <p style={{color:"#777",fontSize:SZ.xs,margin:"8px 0 0",lineHeight:1.4}}>{t("backup_desc")}</p>
+      </div>
+
+      {/* ═══ DANGER ZONE ═══ */}
+      <button onClick={() => { if (confirm(t("delete_confirm"))) { localStorage.clear(); location.reload(); } }}
+        style={{width:"100%",padding:"14px",borderRadius:14,border:"1px solid rgba(255,71,87,0.3)",background:"rgba(255,71,87,0.07)",color:"#ff4757",fontSize:SZ.md,fontWeight:600,cursor:"pointer"}}>
+        {t("delete_all")}
+      </button>
+      <p style={{color:"#555",fontSize:SZ.xs,textAlign:"center",marginTop:16}}>GymClimb v6.0 · Data stored locally on this device</p>
+    </div>
+  );
+  };
+
+  /* ═══ GARMIN ═══ */
+  const renderGarmin = () => (
+    <div style={{padding:"0 16px"}}>
+      <div style={{display:"flex",alignItems:"center",padding:"16px 0",paddingTop:"calc(16px + env(safe-area-inset-top, 0px))",gap:10}}>
+        <button onClick={() => setView("settings")} style={{width:40,height:40,borderRadius:12,border:"1px solid #222",background:"#111",color:"#888",fontSize:SZ.lg,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}>‹</button>
+        <h2 style={{color:"#fff",fontSize:SZ.xl,fontWeight:700,margin:0}}>⌚ {(WATCHES[watchType]||WATCHES.other).name}</h2>
+      </div>
+      <p style={{color:"#999",fontSize:SZ.cardSub,margin:"0 0 14px",lineHeight:1.5}}>{t("morning")} · {(WATCHES[watchType]||WATCHES.other).name}</p>
+      <MorningForm onSave={svGarmin} week={week} wt={watchType}/>
+      <p style={{color:"#999",fontSize:SZ.sm,letterSpacing:2,margin:"20px 0 10px"}}>{t("history")} – W{week}</p>
+      {garmin.filter(g=>g.week===week).length===0?<p style={{color:"#555",fontSize:SZ.cardSub,textAlign:"center",padding:20}}>{t("no_entries")}</p>:
+        [...garmin.filter(g=>g.week===week)].reverse().map((g,i) => {
+          const id = g.id || i;
+          const isExp = expEntry === id;
+          const r = +(g.readiness)||0, b = +(g.battery)||0, sl = +(g.sleep)||0, st = +(g.stress)||0, rhr = +(g.rhr)||0;
+
+          // Smart insights
+          const insights = [];
+          if (r > 0 && r < 35) insights.push({icon:"🔴",text:t("ins_low_ready"),sev:"critical"});
+          else if (r >= 35 && r < 60) insights.push({icon:"🟡",text:t("ins_mod_ready"),sev:"warn"});
+          else if (r >= 60) insights.push({icon:"🟢",text:t("ins_good_ready"),sev:"ok"});
+
+          if (sl > 0 && sl < 40) insights.push({icon:"😴",text:t("ins_poor_sleep"),sev:"critical"});
+          else if (sl >= 40 && sl < 70) insights.push({icon:"😐",text:t("ins_avg_sleep"),sev:"warn"});
+          else if (sl >= 70) insights.push({icon:"🌙",text:t("ins_good_sleep"),sev:"ok"});
+
+          if (st > 70) insights.push({icon:"😰",text:t("ins_high_stress"),sev:"critical"});
+          else if (st > 40) insights.push({icon:"😤",text:t("ins_mod_stress"),sev:"warn"});
+
+          if (b > 0 && b < 25) insights.push({icon:"🪫",text:t("ins_low_bat"),sev:"critical"});
+          else if (b >= 25 && b < 60) insights.push({icon:"🔋",text:t("ins_mod_bat"),sev:"warn"});
+          else if (b >= 60) insights.push({icon:"⚡",text:t("ins_high_bat"),sev:"ok"});
+
+          if (rhr > 0) {
+            const avgRhr = garmin.filter(x=>+(x.rhr)>0).reduce((a,x)=>a+(+(x.rhr)||0),0) / Math.max(garmin.filter(x=>+(x.rhr)>0).length,1);
+            if (rhr > avgRhr + 5) insights.push({icon:"❤️‍🔥",text:`Resting HR elevated (+${(rhr-avgRhr).toFixed(0)} above avg) – possible overtraining or illness`,sev:"critical"});
+            else if (rhr < avgRhr - 3) insights.push({icon:"❤️",text:"Resting HR below average – excellent recovery",sev:"ok"});
+          }
+
+          // Pattern detection
+          const weekEntries = garmin.filter(x=>x.week===week);
+          const lowDays = weekEntries.filter(x=>(+(x.readiness)||100)<35).length;
+          if (lowDays >= 3) insights.push({icon:"⚠️",text:`${lowDays} low readiness days this week – consider a deload week`,sev:"critical"});
+
+          const sleepTrend = weekEntries.filter(x=>+(x.sleep)>0);
+          if (sleepTrend.length >= 3) {
+            const recent = sleepTrend.slice(-2).reduce((a,x)=>a+(+(x.sleep)||0),0)/2;
+            const earlier = sleepTrend.slice(0,2).reduce((a,x)=>a+(+(x.sleep)||0),0)/2;
+            if (recent < earlier - 10) insights.push({icon:"📉",text:"Sleep quality declining – prioritize sleep hygiene",sev:"warn"});
+          }
+
+          // Overall score
+          const scores = [r,sl,b].filter(x=>x>0);
+          const avg = scores.length > 0 ? Math.round(scores.reduce((a,x)=>a+x,0)/scores.length) : null;
+          const sevCol = {critical:"#ff4757",warn:"#ffd43b",ok:"#51cf66"};
+
+          // All fields for this watch type
+          const cfg = WATCHES[watchType] || WATCHES.other;
+          const allFields = cfg.fields.map(f => ({...f, val: g[f.k]})).filter(f => f.val);
+
+          return (
+            <div key={id} style={{marginBottom:8}}>
+              <button onClick={() => setExpEntry(isExp ? null : id)} style={{width:"100%",background:isExp?"linear-gradient(135deg,#111118,#181825)":"#111118",borderRadius:isExp?"13px 13px 0 0":"13px",padding:"13px 15px",border:isExp?"1px solid rgba(116,143,252,0.2)":"1px solid #1a1a25",cursor:"pointer",textAlign:"left"}}>
+                <div style={{display:"flex",justifyContent:"space-between",marginBottom:6}}>
+                  <span style={{color:"#748ffc",fontSize:SZ.sm,fontWeight:600}}>⌚ {new Date(g.date).toLocaleDateString("en",{weekday:"short",day:"numeric",month:"short"})}</span>
+                  <div style={{display:"flex",alignItems:"center",gap:6}}>
+                    {avg!==null&&<span style={{color:rcol(avg),fontSize:SZ.sm,fontFamily:Mo,fontWeight:700}}>{avg}</span>}
+                    <span style={{color:rcol(r),fontSize:SZ.cardSub,fontWeight:700}}>{rlab(r)}</span>
+                  </div>
+                </div>
+                <div style={{display:"grid",gridTemplateColumns:`repeat(${Math.min(allFields.length,4)},1fr)`,gap:6}}>
+                  {allFields.slice(0,4).map(x => (
+                    <div key={x.k} style={{background:"#0a0a14",borderRadius:7,padding:"6px",textAlign:"center"}}>
+                      <p style={{color:"#777",fontSize:9,letterSpacing:1,margin:0}}>{x.l.split(" ")[0]}</p>
+                      <p style={{color:x.k==="readiness"?rcol(+(x.val)||0):x.k==="sleep"?scol(+(x.val)||0):x.k==="battery"?bcol(+(x.val)||0):"#aaa",fontSize:SZ.md,fontWeight:700,margin:"2px 0 0",fontFamily:Mo}}>{x.val}</p>
+                    </div>
+                  ))}
+                </div>
+              </button>
+
+              {/* ─── EXPANDED INSIGHTS ─── */}
+              {isExp && (
+                <div style={{background:"linear-gradient(180deg,#141420,#111118)",borderRadius:"0 0 13px 13px",padding:"16px",border:"1px solid rgba(116,143,252,0.2)",borderTop:"none"}}>
+                  {/* All metrics with bars */}
+                  {allFields.length > 4 && (
+                    <div style={{display:"grid",gridTemplateColumns:`repeat(${Math.min(allFields.length-4,3)},1fr)`,gap:6,marginBottom:14}}>
+                      {allFields.slice(4).map(x => (
+                        <div key={x.k} style={{background:"#0a0a14",borderRadius:7,padding:"6px",textAlign:"center"}}>
+                          <p style={{color:"#777",fontSize:9,margin:0}}>{x.l.split(" ")[0]}</p>
+                          <p style={{color:"#aaa",fontSize:SZ.md,fontWeight:700,margin:"2px 0 0",fontFamily:Mo}}>{x.val}</p>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Visual metric bars */}
+                  <p style={{color:"#748ffc",fontSize:SZ.xs,letterSpacing:2,margin:"0 0 10px",fontWeight:600}}>{t("metric_bd")}</p>
+                  {allFields.filter(f => +(f.val) > 0 && +(f.val) <= 100).map(f => {
+                    const v = +(f.val);
+                    const col = f.k==="readiness"?rcol(v):f.k==="sleep"?scol(v):f.k==="stress"?(v>70?"#ff4757":v>40?"#ffd43b":"#51cf66"):bcol(v);
+                    return (
+                      <div key={f.k} style={{marginBottom:8}}>
+                        <div style={{display:"flex",justifyContent:"space-between",marginBottom:3}}>
+                          <span style={{color:"#999",fontSize:SZ.xs}}>{f.i} {f.l}</span>
+                          <span style={{color:col,fontSize:SZ.sm,fontWeight:700,fontFamily:Mo}}>{v}</span>
+                        </div>
+                        <div style={{height:8,background:"#1a1a25",borderRadius:4,overflow:"hidden"}}>
+                          <div style={{width:`${f.k==="stress"?100-v:v}%`,height:"100%",background:col,borderRadius:4,transition:"width 0.5s"}}/>
+                        </div>
+                      </div>
+                    );
+                  })}
+
+                  {/* Smart Insights */}
+                  {insights.length > 0 && (<>
+                    <p style={{color:"#ffd43b",fontSize:SZ.xs,letterSpacing:2,margin:"14px 0 8px",fontWeight:600}}>{t("insights")}</p>
+                    {insights.map((ins, j) => (
+                      <div key={j} style={{display:"flex",alignItems:"flex-start",gap:10,padding:"10px 12px",background:ins.sev==="critical"?"rgba(255,71,87,0.06)":ins.sev==="warn"?"rgba(255,212,59,0.04)":"rgba(81,207,102,0.04)",borderRadius:10,border:`1px solid ${ins.sev==="critical"?"rgba(255,71,87,0.15)":ins.sev==="warn"?"rgba(255,212,59,0.1)":"rgba(81,207,102,0.1)"}`,marginBottom:5}}>
+                        <span style={{fontSize:SZ.md,flexShrink:0,marginTop:1}}>{ins.icon}</span>
+                        <p style={{color:sevCol[ins.sev],fontSize:SZ.sm,margin:0,lineHeight:1.4}}>{ins.text}</p>
+                      </div>
+                    ))}
+                  </>)}
+
+                  {/* Overall Assessment */}
+                  {avg !== null && (
+                    <div style={{marginTop:12,padding:"12px 14px",background:avg>=60?"rgba(81,207,102,0.06)":avg>=35?"rgba(255,212,59,0.06)":"rgba(255,71,87,0.06)",borderRadius:10,border:`1px solid ${avg>=60?"rgba(81,207,102,0.15)":avg>=35?"rgba(255,212,59,0.15)":"rgba(255,71,87,0.15)"}`,textAlign:"center"}}>
+                      <p style={{color:"#999",fontSize:SZ.xs,margin:"0 0 4px",letterSpacing:1}}>{t("overall")}</p>
+                      <p style={{color:rcol(avg),fontSize:SZ.xxl,fontWeight:700,margin:0,fontFamily:Mo}}>{avg}</p>
+                      <p style={{color:rcol(avg),fontSize:SZ.sm,fontWeight:600,margin:"4px 0 0"}}>
+                        {avg >= 75 ? "Excellent – peak performance day" : avg >= 60 ? "Good – solid training day" : avg >= 45 ? "Fair – moderate session recommended" : avg >= 30 ? "Low – light activity only" : "Critical – full rest recommended"}
+                      </p>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          );
+        })
+      }
+    </div>
+  );
+
+  /* ═══ PROGRESS ═══ */
+  const renderProgress = () => (
+    <div style={{padding:"0 16px"}}>
+      <div style={{display:"flex",alignItems:"center",padding:"16px 0",paddingTop:"calc(16px + env(safe-area-inset-top, 0px))",gap:10}}>
+        <button onClick={() => setView("settings")} style={{width:40,height:40,borderRadius:12,border:"1px solid #222",background:"#111",color:"#888",fontSize:SZ.lg,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}>‹</button>
+        <h2 style={{color:"#fff",fontSize:SZ.xl,fontWeight:700,margin:0}}>{t("weekly_prog")}</h2>
+      </div>
+      <button onClick={() => setShowPF(!showPF)} style={{width:"100%",padding:"13px",borderRadius:13,border:"1px dashed #00d2ff",background:showPF?"rgba(0,210,255,0.07)":"none",color:"#00d2ff",fontSize:SZ.cardSub,fontWeight:600,cursor:"pointer",marginBottom:14}}>{showPF?"Close":`+ Add for W${week}`}</button>
+      {showPF&&<ProgForm onSave={e=>{svProg(e);setShowPF(false)}} week={week}/>}
+      {[...prog].reverse().map((p,i) => {
+        const bmi = (Number(height) >= 100 && p.bodyWeight && Number(p.bodyWeight) > 0) ? (Number(p.bodyWeight) / Math.pow(Number(height)/100, 2)).toFixed(1) : null;
+        const bmiOk = bmi && isFinite(bmi) && bmi > 0 && bmi < 100;
+        const bmiCol = bmiOk ? (bmi < 18.5 ? "#339af0" : bmi < 25 ? "#51cf66" : bmi < 30 ? "#ffd43b" : "#ff4757") : "#999";
+        return (
+          <div key={i} style={{background:"#111118",borderRadius:13,padding:"13px 15px",marginBottom:7,border:"1px solid #1a1a25"}}>
+            <div style={{display:"flex",justifyContent:"space-between",marginBottom:6}}>
+              <span style={{color:"#00d2ff",fontSize:SZ.sm,fontWeight:600}}>{t("week_n")} {p.week || p.wk}</span>
+              <div style={{display:"flex",gap:10,alignItems:"baseline"}}>
+                {bmiOk && <span style={{color:bmiCol,fontSize:SZ.sm,fontFamily:Mo}}>BMI {bmi}</span>}
+                <span style={{color:"#ffd43b",fontSize:SZ.md,fontWeight:700,fontFamily:Mo}}>{p.bodyWeight} kg</span>
+              </div>
+            </div>
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:6}}>
+              {[{l:"Bench",v:p.bench,c:"#ff6b6b"},{l:"Squat",v:p.squat,c:"#cc5de8"},{l:"Deadlift",v:p.deadlift,c:"#51cf66"}].map(x=>(<div key={x.l} style={{background:"#0a0a14",borderRadius:8,padding:"8px",textAlign:"center"}}><p style={{color:"#999",fontSize:SZ.xs,letterSpacing:1,margin:0}}>{x.l}</p><p style={{color:x.c,fontSize:SZ.lg,fontWeight:700,margin:"2px 0 0",fontFamily:Mo}}>{x.v||"--"}</p></div>))}
+            </div>
+            {(p.waist||p.chest||p.arms||p.bodyFat) && (
+              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr 1fr",gap:5,marginTop:6}}>
+                {[{l:"Waist",v:p.waist,u:"cm"},{l:"Chest",v:p.chest,u:"cm"},{l:"Arms",v:p.arms,u:"cm"},{l:"BF%",v:p.bodyFat,u:"%"}].filter(x=>x.v).map(x=>(<div key={x.l} style={{background:"#0a0a14",borderRadius:6,padding:"5px",textAlign:"center"}}><p style={{color:"#777",fontSize:9,margin:0}}>{x.l}</p><p style={{color:"#20c997",fontSize:SZ.sm,fontWeight:600,margin:"1px 0 0",fontFamily:Mo}}>{x.v}{x.u}</p></div>))}
+              </div>
+            )}
+            {p.note && <p style={{color:"#777",fontSize:SZ.xs,margin:"6px 0 0",fontStyle:"italic"}}>{p.note}</p>}
+          </div>
+        );
+      })}
+    </div>
+  );
+
+  /* ═══ RENDER ═══ */
+  return (
+    <div style={{minHeight:"100dvh",background:"#0a0a14",fontFamily:Fn,maxWidth:480,margin:"0 auto",position:"relative",WebkitOverflowScrolling:"touch",overscrollBehavior:"none"}}>
+      <div className="safe-bottom">
+        {view==="home"&&renderHome()}{view==="day"&&renderDay()}{view==="outdoor"&&renderOutdoor()}
+        {view==="dashboard"&&renderDash()}{view==="settings"&&renderSettings()}{view==="garmin"&&renderGarmin()}{view==="progress"&&renderProgress()}
+      </div>
+      {showTimer&&<RestTimer onClose={() => setShowTimer(false)}/>}
+
+      {/* Bottom Nav */}
+      {(() => {
+        const dis = dismissed[`${week}`] || [];
+        let pending = 0;
+        if (garmin.filter(g=>g.week===week).length===0 && !dis.includes("garmin")) pending++;
+        if (!prog.find(p=>p.week===week) && !dis.includes("progress")) pending++;
+        const inc = program.filter((d,i) => d.type==="workout"&&dayProg(i)!==null&&dayProg(i)<100).length;
+        if (inc>0 && !dis.includes("workouts")) pending++;
+        if (climb.filter(c=>c.week===week).length===0 && !dis.includes("climb")) pending++;
+        if (hikes.filter(h=>h.week===week).length===0 && !dis.includes("hike")) pending++;
+        return (
+          <div className="nav-safe" style={{position:"fixed",bottom:0,left:"50%",transform:"translateX(-50%)",width:"100%",maxWidth:480,background:"rgba(10,10,20,0.97)",borderTop:"1px solid #1a1a25",paddingTop:8,display:"flex",justifyContent:"space-around",backdropFilter:"blur(20px)",WebkitBackdropFilter:"blur(20px)",zIndex:100}}>
+            {[{id:"home",i:"🏠",l:t("nav_program"),badge:pending},{id:"outdoor",i:"🏔️",l:t("nav_outdoor")},{id:"dashboard",i:"📊",l:t("nav_analytics")},{id:"settings",i:"⚙️",l:t("nav_settings")}].map(t=>(
+              <button key={t.id} onClick={() => setView(t.id)} style={{background:"none",border:"none",cursor:"pointer",display:"flex",flexDirection:"column",alignItems:"center",gap:2,padding:"6px 16px",position:"relative",minHeight:50,minWidth:50,WebkitTapHighlightColor:"transparent"}}>
+                <span style={{fontSize:SZ.navIcon}}>{t.i}</span>
+                <span style={{fontSize:SZ.navLabel,letterSpacing:0.5,color:view===t.id?"#00d2ff":"#888",fontWeight:view===t.id?700:400}}>{t.l}</span>
+                {t.badge>0&&<div style={{position:"absolute",top:-2,right:4,width:20,height:20,borderRadius:10,background:"#ff4757",display:"flex",alignItems:"center",justifyContent:"center"}}><span style={{color:"#fff",fontSize:11,fontWeight:700}}>{t.badge}</span></div>}
+              </button>
+            ))}
+          </div>
+        );
+      })()}
+    </div>
+  );
+}
+
+/* ═══════════ SUB COMPONENTS ═══════════ */
+
+function CC({t:title,c,children}) {
+  return (<div style={{background:"#111118",borderRadius:14,padding:"14px 10px 10px 0",border:"1px solid #1a1a25",marginBottom:10,animation:"fadeUp 0.5s ease-out both"}}><p style={{color:c||"#aaa",fontSize:SZ.sm,letterSpacing:2,margin:"0 0 8px 14px",fontWeight:600}}>{title}</p>{children}</div>);
+}
+
+function GarminCard({gm,isLow,onAdd}) {
+  if (!gm) return (<button onClick={onAdd} style={{width:"100%",background:"linear-gradient(135deg,#0f1520,#152035)",borderRadius:16,padding:"18px 20px",marginBottom:12,border:"1px dashed rgba(116,143,252,0.3)",cursor:"pointer",textAlign:"left"}}><div style={{display:"flex",alignItems:"center",justifyContent:"space-between"}}><div><p style={{color:"#748ffc",fontSize:SZ.sm,letterSpacing:2,margin:0,fontWeight:600}}>⌚ {t("smartwatch")}</p><p style={{color:"#999",fontSize:SZ.cardSub,margin:"4px 0 0"}}>{t("rem_watch")} →</p></div><span style={{fontSize:36}}>⌚</span></div></button>);
+  const r=Number(gm.readiness)||0,b=Number(gm.battery)||0,sl=Number(gm.sleep)||0;
+  return (<button onClick={onAdd} style={{width:"100%",background:isLow?"linear-gradient(135deg,#1a0a0a,#200a0a)":"linear-gradient(135deg,#0a1a10,#0a2015)",borderRadius:16,padding:"16px 18px",marginBottom:12,border:isLow?"1px solid rgba(255,71,87,0.2)":"1px solid rgba(81,207,102,0.15)",cursor:"pointer",textAlign:"left"}}>
+    <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}><p style={{color:"#748ffc",fontSize:SZ.sm,letterSpacing:2,margin:0,fontWeight:600}}>⌚ {t("smartwatch")}</p><span style={{color:rcol(r),fontSize:SZ.md,fontWeight:700}}>{rlab(r)}</span></div>
+    <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr 1fr",gap:7}}>
+      {[{l:"Readiness",v:r,c:rcol(r),mx:100},{l:"Battery",v:b,c:bcol(b),mx:100},{l:"Sleep",v:sl,c:scol(sl),mx:100},{l:"Recovery",v:gm.recovery||"–",c:"#748ffc",mx:null}].map(x=>(<div key={x.l} style={{textAlign:"center"}}><p style={{color:"#777",fontSize:9,letterSpacing:1,margin:0}}>{x.l}</p><p style={{color:x.c,fontSize:SZ.lg,fontWeight:700,margin:"3px 0 0",fontFamily:Mo}}>{x.v}</p>{x.mx&&<div style={{height:3,background:"#1a1a25",borderRadius:2,marginTop:3,overflow:"hidden"}}><div style={{width:`${(Number(x.v)||0)/x.mx*100}%`,height:"100%",background:x.c,borderRadius:2}}/></div>}</div>))}
+    </div>
+  </button>);
+}
+
+function MorningForm({onSave,week,wt}) {
+  const cfg = WATCHES[wt] || WATCHES.other;
+  const [f,setF] = useState(() => {const o = {}; cfg.fields.forEach(x => o[x.k] = ""); return o;});
+  return (<div style={{background:"#111118",borderRadius:14,padding:"18px",border:"1px solid #1a1a25",marginBottom:14}}>
+    <p style={{color:"#748ffc",fontSize:SZ.sm,letterSpacing:2,margin:"0 0 12px",fontWeight:600}}>{t('morning')} · {cfg.name}</p>
+    <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
+      {cfg.fields.map(x => (<div key={x.k}><label style={{color:"#999",fontSize:SZ.xs}}>{x.i} {x.l}</label><input type="number" inputMode="numeric" placeholder={x.p} value={f[x.k]||""} onChange={e => setF({...f,[x.k]:e.target.value})} style={{width:"100%",padding:"10px",borderRadius:10,border:"1px solid #222",background:"#0a0a14",color:"#fff",fontSize:SZ.input,fontFamily:Mo,outline:"none",boxSizing:"border-box",marginTop:4}}/></div>))}
+    </div>
+    <button onClick={() => {const hasVal = Object.values(f).some(v => v); if(hasVal){onSave(f);const o = {}; cfg.fields.forEach(x => o[x.k] = ""); setF(o)}}} style={{width:"100%",padding:"13px",borderRadius:12,border:"none",background:"#748ffc",color:"#000",fontSize:SZ.btn,fontWeight:700,cursor:"pointer",marginTop:14}}>Save ⌚</button>
+  </div>);
+}
+
+function PostWOCard({pwo,onSave}) {
+  const [show,setShow] = useState(false);
+  const [f,setF] = useState({avgHR:"",maxHR:"",calories:"",teAerobic:"",teAnaerobic:"",load:""});
+  if (pwo&&!show) return (<div style={{background:"#111118",borderRadius:14,padding:"14px 16px",marginTop:8,border:"1px solid #1a1a25"}}><p style={{color:"#748ffc",fontSize:SZ.sm,letterSpacing:2,margin:"0 0 8px",fontWeight:600}}>⌚ POST-WORKOUT</p><div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:6}}>{[{l:"❤️ HR",v:pwo.avgHR?`${pwo.avgHR}/${pwo.maxHR||"–"}`:null,c:"#ff6b6b"},{l:"🔥 kcal",v:pwo.calories,c:"#ffa94d"},{l:"⚡ Load",v:pwo.load,c:"#ffd43b"}].filter(x=>x.v).map(x=>(<div key={x.l} style={{background:"#0a0a14",borderRadius:7,padding:"6px",textAlign:"center"}}><p style={{color:"#777",fontSize:9,margin:0}}>{x.l}</p><p style={{color:x.c,fontSize:SZ.md,fontWeight:700,margin:"2px 0 0",fontFamily:Mo}}>{x.v}</p></div>))}</div></div>);
+  return (<div style={{marginTop:8}}><button onClick={() => setShow(!show)} style={{width:"100%",padding:"12px",borderRadius:13,border:"1px dashed rgba(116,143,252,0.4)",background:show?"rgba(116,143,252,0.05)":"none",color:"#748ffc",fontSize:SZ.cardSub,fontWeight:600,cursor:"pointer"}}>{show?"Cancel":"⌚ Add watch post-workout"}</button>
+    {show&&<div style={{background:"#111118",borderRadius:14,padding:"16px",border:"1px solid #1a1a25",marginTop:8}}>
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:7}}>
+        {[{k:"avgHR",l:"Avg HR",p:"bpm"},{k:"maxHR",l:"Max HR",p:"bpm"},{k:"calories",l:"Calories",p:"kcal"},{k:"teAerobic",l:"TE Aero",p:"0–5"},{k:"teAnaerobic",l:"TE Anaero",p:"0–5"},{k:"load",l:"Load",p:"EPOC"}].map(x=>(<div key={x.k}><label style={{color:"#999",fontSize:SZ.xs}}>{x.l}</label><input type="number" inputMode="decimal" placeholder={x.p} value={f[x.k]} onChange={e=>setF({...f,[x.k]:e.target.value})} style={{width:"100%",padding:"7px",borderRadius:8,border:"1px solid #222",background:"#0a0a14",color:"#fff",fontSize:SZ.md,fontFamily:Mo,outline:"none",boxSizing:"border-box",marginTop:3}}/></div>))}
+      </div>
+      <button onClick={() => {onSave(f);setShow(false)}} style={{width:"100%",padding:"12px",borderRadius:10,border:"none",background:"#748ffc",color:"#000",fontSize:SZ.md,fontWeight:700,cursor:"pointer",marginTop:10}}>Save ⌚</button>
+    </div>}
+  </div>);
+}
+
+function AddExForm({onSave,compact}) {
+  const [f,setF] = useState({name:"",sets:3,reps:"10",muscle:"chest"});
+  return (<div style={{background:compact?"#0a0a14":"#111118",borderRadius:12,padding:compact?"12px":"16px",border:"1px solid #1a1a25",marginBottom:8,marginTop:compact?6:0}}>
+    <input type="text" placeholder={t("ex_name")} value={f.name} onChange={e=>setF({...f,name:e.target.value})} style={{width:"100%",padding:"9px 10px",borderRadius:9,border:"1px solid #222",background:"#0a0a14",color:"#fff",fontSize:SZ.md,outline:"none",boxSizing:"border-box",marginBottom:8}}/>
+    <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:7}}>
+      <div><label style={{color:"#999",fontSize:SZ.xs}}>{t("sets")}</label><input type="number" inputMode="numeric" value={f.sets} onChange={e=>setF({...f,sets:Number(e.target.value)})} style={{width:"100%",padding:"7px",borderRadius:8,border:"1px solid #222",background:"#0a0a14",color:"#fff",fontSize:SZ.md,fontFamily:Mo,outline:"none",boxSizing:"border-box"}}/></div>
+      <div><label style={{color:"#999",fontSize:SZ.xs}}>{t("reps")}</label><input type="text" value={f.reps} onChange={e=>setF({...f,reps:e.target.value})} style={{width:"100%",padding:"7px",borderRadius:8,border:"1px solid #222",background:"#0a0a14",color:"#fff",fontSize:SZ.md,outline:"none",boxSizing:"border-box"}}/></div>
+      <div><label style={{color:"#999",fontSize:SZ.xs}}>{t("muscle")}</label><select value={f.muscle} onChange={e=>setF({...f,muscle:e.target.value})} style={{width:"100%",padding:"7px",borderRadius:8,border:"1px solid #222",background:"#0a0a14",color:"#fff",fontSize:SZ.sm,outline:"none"}}>{MUSCLES.map(m=><option key={m} value={m}>{m}</option>)}</select></div>
+    </div>
+    <button onClick={() => {if(f.name.trim()){onSave(f);setF({name:"",sets:3,reps:"10",muscle:"chest"})}}} style={{width:"100%",padding:"10px",borderRadius:10,border:"none",background:"#00d2ff",color:"#000",fontSize:SZ.cardSub,fontWeight:700,cursor:"pointer",marginTop:8}}>+ Add</button>
+  </div>);
+}
+
+function ProgForm({onSave,week}) {
+  const [f,setF] = useState({bodyWeight:"",bench:"",squat:"",deadlift:"",pullups:"",waist:"",chest:"",arms:"",bodyFat:"",note:""});
+  return (<div style={{background:"#111118",borderRadius:14,padding:"18px",border:"1px solid #1a1a25",marginBottom:14}}>
+    <p style={{color:"#00d2ff",fontSize:SZ.sm,fontWeight:600,margin:"0 0 10px"}}>Week {week}</p>
+    <p style={{color:"#999",fontSize:SZ.xs,letterSpacing:2,margin:"0 0 6px"}}>{t("lifts_weight")}</p>
+    {[{k:"bodyWeight",l:"⚖️ Body weight (kg)"},{k:"bench",l:"🏋️ Bench (kg)"},{k:"squat",l:"🦵 Squat (kg)"},{k:"deadlift",l:"💀 Deadlift (kg)"},{k:"pullups",l:"💪 Pull-ups (max)"}].map(x=>(<div key={x.k} style={{marginBottom:9}}><label style={{color:"#999",fontSize:SZ.xs}}>{x.l}</label><input type="number" inputMode="decimal" value={f[x.k]} onChange={e=>setF({...f,[x.k]:e.target.value})} style={{width:"100%",padding:"9px 10px",borderRadius:9,border:"1px solid #222",background:"#0a0a14",color:"#fff",fontSize:SZ.input,fontFamily:Mo,outline:"none",marginTop:3,boxSizing:"border-box"}}/></div>))}
+    <p style={{color:"#999",fontSize:SZ.xs,letterSpacing:2,margin:"14px 0 6px"}}>{t("body_meas")}</p>
+    <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
+      {[{k:"waist",l:"Waist (cm)"},{k:"chest",l:"Chest (cm)"},{k:"arms",l:"Arms (cm)"},{k:"bodyFat",l:"Body fat (%)"}].map(x=>(<div key={x.k}><label style={{color:"#999",fontSize:SZ.xs}}>{x.l}</label><input type="number" inputMode="decimal" placeholder="--" value={f[x.k]} onChange={e=>setF({...f,[x.k]:e.target.value})} style={{width:"100%",padding:"8px 10px",borderRadius:9,border:"1px solid #222",background:"#0a0a14",color:"#fff",fontSize:SZ.input,fontFamily:Mo,outline:"none",marginTop:3,boxSizing:"border-box"}}/></div>))}
+    </div>
+    <input type="text" placeholder={t("notes")} value={f.note} onChange={e=>setF({...f,note:e.target.value})} style={{width:"100%",padding:"8px 10px",borderRadius:8,border:"1px solid #222",background:"#0a0a14",color:"#999",fontSize:SZ.sm,outline:"none",boxSizing:"border-box",marginTop:10}}/>
+    <button onClick={() => onSave(f)} style={{width:"100%",padding:"13px",borderRadius:11,border:"none",background:"#00d2ff",color:"#000",fontSize:SZ.btn,fontWeight:700,cursor:"pointer",marginTop:10}}>{t("save_prog")}</button>
+  </div>);
+}
+
+function ClimbLog({climb,week,onSave,onDel,onUpd}) {
+  const [show,setShow] = useState(false);
+  const [exp,setExp] = useState(null);
+  const [editing,setEditing] = useState(null);
+  const [ef,setEf] = useState({});
+  const [f,setF] = useState({style:"bouldering",grade:"V3",attempts:1,status:"redpoint",hours:"",mins:"",location:"",wx:"",note:""});
+  const gr=f.style==="bouldering"?BG:SG; const wk=climb.filter(c=>c.week===week&&c.type!=="session");
+  const startEdit = (r) => { setEditing(String(r.id||r.date)); setEf({...r, hours:String(Math.floor((r.duration||0)/60)), mins:String((r.duration||0)%60)}); };
+  const saveEdit = () => { onUpd(editing, {...ef, duration:(+(ef.hours)||0)*60+(+(ef.mins)||0)}); setEditing(null); };
+  return (<div>
+    <button onClick={() => setShow(!show)} style={{width:"100%",padding:"12px",borderRadius:13,border:"1px dashed #51cf66",background:show?"rgba(81,207,102,0.07)":"none",color:"#51cf66",fontSize:SZ.cardSub,fontWeight:600,cursor:"pointer",marginBottom:12}}>{show?t("cancel"):t("new_route")}</button>
+    {show&&<div style={{background:"#111118",borderRadius:14,padding:"16px",border:"1px solid #1a1a25",marginBottom:12}}>
+      <div style={{display:"flex",gap:6,marginBottom:10}}>{["bouldering","sport"].map(s=>(<button key={s} onClick={() => setF({...f,style:s,grade:s==="bouldering"?"V3":"6a"})} style={{flex:1,padding:"9px",borderRadius:10,border:"none",background:f.style===s?"#51cf66":"#1a1a25",color:f.style===s?"#000":"#999",fontWeight:600,fontSize:SZ.sm,cursor:"pointer"}}>{s==="bouldering"?t("boulder"):t("sport")}</button>))}</div>
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:8}}>
+        <div><label style={{color:"#999",fontSize:SZ.xs}}>{t("grade")}</label><select value={f.grade} onChange={e=>setF({...f,grade:e.target.value})} style={{width:"100%",padding:"9px",borderRadius:9,border:"1px solid #222",background:"#0a0a14",color:"#fff",fontSize:SZ.md,fontFamily:Mo,outline:"none"}}>{gr.map(g=><option key={g} value={g}>{g}</option>)}</select></div>
+        <div><label style={{color:"#999",fontSize:SZ.xs}}>{t("status")}</label><select value={f.status} onChange={e=>setF({...f,status:e.target.value})} style={{width:"100%",padding:"9px",borderRadius:9,border:"1px solid #222",background:"#0a0a14",color:"#fff",fontSize:SZ.cardSub,outline:"none"}}>{[["flash","⚡ Flash"],["redpoint","🔴 Redpoint"],["project","🔧 Project"]].map(([v,l])=><option key={v} value={v}>{l}</option>)}</select></div>
+      </div>
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8,marginBottom:8}}>
+        <div><label style={{color:"#999",fontSize:SZ.xs}}>{t("attempts")}</label><input type="number" inputMode="numeric" value={f.attempts} onChange={e=>setF({...f,attempts:e.target.value})} style={{width:"100%",padding:"9px",borderRadius:9,border:"1px solid #222",background:"#0a0a14",color:"#fff",fontSize:SZ.md,fontFamily:Mo,outline:"none",boxSizing:"border-box"}}/></div>
+        <div><label style={{color:"#999",fontSize:SZ.xs}}>{t("hours")}</label><input type="number" inputMode="numeric" placeholder="0" value={f.hours} onChange={e=>setF({...f,hours:e.target.value})} style={{width:"100%",padding:"9px",borderRadius:9,border:"1px solid #222",background:"#0a0a14",color:"#fff",fontSize:SZ.md,fontFamily:Mo,outline:"none",boxSizing:"border-box"}}/></div>
+        <div><label style={{color:"#999",fontSize:SZ.xs}}>{t("minutes")}</label><input type="number" inputMode="numeric" placeholder="0" value={f.mins} onChange={e=>setF({...f,mins:e.target.value})} style={{width:"100%",padding:"9px",borderRadius:9,border:"1px solid #222",background:"#0a0a14",color:"#fff",fontSize:SZ.md,fontFamily:Mo,outline:"none",boxSizing:"border-box"}}/></div>
+      </div>
+      <input type="text" placeholder={t("location")} value={f.location} onChange={e=>setF({...f,location:e.target.value})} style={{width:"100%",padding:"10px",borderRadius:9,border:"1px solid #222",background:"#0a0a14",color:"#fff",fontSize:SZ.sm,outline:"none",boxSizing:"border-box",marginBottom:8}}/>
+      <input type="text" placeholder={t("notes")} value={f.note} onChange={e=>setF({...f,note:e.target.value})} style={{width:"100%",padding:"9px",borderRadius:9,border:"1px solid #222",background:"#0a0a14",color:"#999",fontSize:SZ.sm,outline:"none",boxSizing:"border-box",marginBottom:8}}/>
+      <button onClick={() => {onSave({...f,type:"route",duration:(+(f.hours)||0)*60+(+(f.mins)||0)});setShow(false)}} style={{width:"100%",padding:"12px",borderRadius:11,border:"none",background:"#51cf66",color:"#000",fontSize:SZ.md,fontWeight:700,cursor:"pointer"}}>{t("save_route")}</button>
+    </div>}
+    {wk.length===0?<p style={{color:"#555",fontSize:SZ.cardSub,textAlign:"center",padding:20}}>{t("no_routes")} W{week}</p>:wk.map((r,i)=>{
+      const rid=String(r.id||r.date||i); const isExp=exp===rid; const isEdit=editing===rid;
+      return (
+        <div key={rid} style={{background:"#111118",borderRadius:13,marginBottom:7,border:isExp?"1px solid rgba(81,207,102,0.2)":"1px solid #1a1a25",overflow:"hidden"}}>
+          <div onClick={() => {if(!isEdit){setExp(isExp?null:rid);setEditing(null)}}} style={{padding:"14px 16px",cursor:"pointer"}}>
+            <div style={{display:"flex",alignItems:"center",gap:10}}>
+              <span style={{fontSize:SZ.icon}}>{r.style==="bouldering"?"🪨":"🧗"}</span>
+              <div style={{flex:1}}>
+                <p style={{color:"#eee",fontSize:SZ.md,fontWeight:600,margin:0}}>{r.grade} <span style={{color:"#999",fontWeight:400,fontSize:SZ.sm}}>{r.status==="flash"?"⚡ Flash":r.status==="redpoint"?"🔴 Redpoint":"🔧 Project"}</span></p>
+                {r.location&&<p style={{color:"#51cf66",fontSize:SZ.xs,margin:"3px 0 0"}}>📍 {r.location}</p>}
+              </div>
+              <span style={{color:"#555",fontSize:SZ.xs}}>{r.date?new Date(r.date).toLocaleDateString("en",{day:"numeric",month:"short"}):""} {isExp?"▼":"›"}</span>
+            </div>
+          </div>
+          {isExp&&!isEdit&&<div style={{padding:"0 16px 14px",borderTop:"1px solid #1a1a25"}}>
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:6,margin:"12px 0 8px"}}>
+              {[{l:"📍",v:r.location||"–"},{l:"⏱",v:r.duration>0?`${Math.floor(r.duration/60)}h${r.duration%60}m`:"–"},{l:"🔢",v:r.attempts?`${r.attempts}x`:"1x"}].map(x=>(<div key={x.l} style={{background:"#0a0a14",borderRadius:8,padding:"8px",textAlign:"center"}}><p style={{color:"#777",fontSize:10,margin:0}}>{x.l}</p><p style={{color:"#ccc",fontSize:SZ.sm,fontWeight:600,margin:"2px 0 0"}}>{x.v}</p></div>))}
+            </div>
+            {r.wx&&<p style={{color:"#51cf66",fontSize:SZ.sm,margin:"0 0 4px"}}>{r.wx}</p>}
+            {r.note&&<p style={{color:"#777",fontSize:SZ.sm,margin:"0 0 10px",fontStyle:"italic"}}>{r.note}</p>}
+            <div style={{display:"flex",gap:8}}>
+              <button onClick={() => startEdit(r)} style={{flex:1,padding:"12px",borderRadius:10,border:"none",background:"#00d2ff",color:"#000",fontSize:SZ.md,fontWeight:700,cursor:"pointer"}}>✏️ {t("edit")}</button>
+              <button onClick={() => onDel(rid)} style={{flex:1,padding:"12px",borderRadius:10,border:"none",background:"#ff4757",color:"#fff",fontSize:SZ.md,fontWeight:700,cursor:"pointer"}}>🗑️</button>
+            </div>
+          </div>}
+          {isEdit&&<div style={{padding:"0 16px 14px",borderTop:"1px solid rgba(0,210,255,0.3)"}}>
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,margin:"12px 0 8px"}}>
+              <div><label style={{color:"#999",fontSize:SZ.xs}}>{t("grade")}</label><select value={ef.grade} onChange={e=>setEf({...ef,grade:e.target.value})} style={{width:"100%",padding:"9px",borderRadius:9,border:"1px solid #222",background:"#0a0a14",color:"#fff",fontSize:SZ.md,outline:"none"}}>{(ef.style==="bouldering"?BG:SG).map(g=><option key={g} value={g}>{g}</option>)}</select></div>
+              <div><label style={{color:"#999",fontSize:SZ.xs}}>{t("status")}</label><select value={ef.status} onChange={e=>setEf({...ef,status:e.target.value})} style={{width:"100%",padding:"9px",borderRadius:9,border:"1px solid #222",background:"#0a0a14",color:"#fff",fontSize:SZ.sm,outline:"none"}}>{[["flash","⚡ Flash"],["redpoint","🔴 Redpoint"],["project","🔧 Project"]].map(([v,l])=><option key={v} value={v}>{l}</option>)}</select></div>
+            </div>
+            <input type="text" value={ef.location||""} onChange={e=>setEf({...ef,location:e.target.value})} placeholder={t("location")} style={{width:"100%",padding:"9px",borderRadius:9,border:"1px solid #222",background:"#0a0a14",color:"#fff",fontSize:SZ.sm,outline:"none",boxSizing:"border-box",marginBottom:8}}/>
+            <input type="text" value={ef.note||""} onChange={e=>setEf({...ef,note:e.target.value})} placeholder={t("notes")} style={{width:"100%",padding:"9px",borderRadius:9,border:"1px solid #222",background:"#0a0a14",color:"#999",fontSize:SZ.sm,outline:"none",boxSizing:"border-box",marginBottom:8}}/>
+            <div style={{display:"flex",gap:8}}>
+              <button onClick={saveEdit} style={{flex:1,padding:"12px",borderRadius:10,border:"none",background:"#51cf66",color:"#000",fontSize:SZ.md,fontWeight:700,cursor:"pointer"}}>✓ {t("save")}</button>
+              <button onClick={() => setEditing(null)} style={{flex:1,padding:"12px",borderRadius:10,border:"1px solid #333",background:"none",color:"#999",fontSize:SZ.md,fontWeight:600,cursor:"pointer"}}>{t("cancel")}</button>
+            </div>
+          </div>}
+        </div>
+    )})}
+  </div>);
+}
+
+function HikeLog({hikes,week,onSave,onDel,onUpd}) {
+  const [show,setShow] = useState(false);
+  const [exp,setExp] = useState(null);
+  const [editing,setEditing] = useState(null);
+  const [ef,setEf] = useState({});
+  const WX = ["☀️ Sunny","🌤️ Clear","⛅ Partly cloudy","☁️ Overcast","🌧️ Rainy","🌨️ Snowy","💨 Windy","🌫️ Foggy"];
+  const [f,setF] = useState({trail:"",distance:"",elevation:"",duration:"",difficulty:"Moderate",wx:"",temp:"",note:""});
+  const wk=hikes.filter(h=>h.week===week);
+  const startEdit = (h) => { setEditing(String(h.id||h.date)); setEf({...h}); };
+  const saveEdit = () => { onUpd(editing, ef); setEditing(null); };
+  return (<div>
+    <button onClick={() => setShow(!show)} style={{width:"100%",padding:"12px",borderRadius:13,border:"1px dashed #20c997",background:show?"rgba(32,201,151,0.07)":"none",color:"#20c997",fontSize:SZ.cardSub,fontWeight:600,cursor:"pointer",marginBottom:12}}>{show?t("cancel"):t("new_hike")}</button>
+    {show&&<div style={{background:"#111118",borderRadius:14,padding:"16px",border:"1px solid #1a1a25",marginBottom:12}}>
+      <input type="text" placeholder={t("trail")} value={f.trail} onChange={e=>setF({...f,trail:e.target.value})} style={{width:"100%",padding:"10px",borderRadius:10,border:"1px solid #222",background:"#0a0a14",color:"#fff",fontSize:SZ.md,outline:"none",boxSizing:"border-box",marginBottom:8}}/>
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:7,marginBottom:8}}>
+        {[{k:"distance",l:t("distance")},{k:"elevation",l:t("elevation")},{k:"duration",l:t("duration")}].map(x=>(<div key={x.k}><label style={{color:"#999",fontSize:SZ.xs}}>{x.l}</label><input type="number" inputMode="decimal" value={f[x.k]} onChange={e=>setF({...f,[x.k]:e.target.value})} style={{width:"100%",padding:"8px",borderRadius:8,border:"1px solid #222",background:"#0a0a14",color:"#fff",fontSize:SZ.md,fontFamily:Mo,outline:"none",boxSizing:"border-box"}}/></div>))}
+      </div>
+      <div style={{marginBottom:8}}><label style={{color:"#999",fontSize:SZ.xs}}>{t("difficulty")}</label><div style={{display:"flex",gap:5,marginTop:4}}>{DIFF.map(d=>(<button key={d} onClick={() => setF({...f,difficulty:d})} style={{flex:1,padding:"8px",borderRadius:8,border:"none",background:f.difficulty===d?"#20c997":"#1a1a25",color:f.difficulty===d?"#000":"#999",fontSize:SZ.xs,fontWeight:600,cursor:"pointer"}}>{d}</button>))}</div></div>
+      <div style={{display:"grid",gridTemplateColumns:"2fr 1fr",gap:8,marginBottom:8}}>
+        <div><label style={{color:"#999",fontSize:SZ.xs}}>{t("weather_lbl")}</label><select value={f.wx} onChange={e=>setF({...f,wx:e.target.value})} style={{width:"100%",padding:"9px",borderRadius:9,border:"1px solid #222",background:"#0a0a14",color:f.wx?"#fff":"#555",fontSize:SZ.sm,outline:"none"}}><option value="">{t("select")}</option>{WX.map(w=><option key={w} value={w}>{w}</option>)}</select></div>
+        <div><label style={{color:"#999",fontSize:SZ.xs}}>{t("temp_lbl")}</label><input type="number" inputMode="numeric" placeholder="--" value={f.temp} onChange={e=>setF({...f,temp:e.target.value})} style={{width:"100%",padding:"8px",borderRadius:9,border:"1px solid #222",background:"#0a0a14",color:"#fff",fontSize:SZ.md,fontFamily:Mo,outline:"none",boxSizing:"border-box"}}/></div>
+      </div>
+      <input type="text" placeholder={t("notes")} value={f.note} onChange={e=>setF({...f,note:e.target.value})} style={{width:"100%",padding:"9px",borderRadius:9,border:"1px solid #222",background:"#0a0a14",color:"#999",fontSize:SZ.sm,outline:"none",boxSizing:"border-box",marginBottom:8}}/>
+      <button onClick={() => {if(f.trail.trim()){onSave(f);setShow(false);setF({trail:"",distance:"",elevation:"",duration:"",difficulty:"Moderate",wx:"",temp:"",note:""})}}} style={{width:"100%",padding:"12px",borderRadius:11,border:"none",background:"#20c997",color:"#000",fontSize:SZ.md,fontWeight:700,cursor:"pointer"}}>{t("save_hike")}</button>
+    </div>}
+    {wk.length===0?<p style={{color:"#555",fontSize:SZ.cardSub,textAlign:"center",padding:20}}>{t("no_hikes")} W{week}</p>:wk.map((h,i)=>{
+      const hid=String(h.id||h.date||i); const isExp=exp===hid; const isEdit=editing===hid;
+      return (
+        <div key={hid} style={{background:"#111118",borderRadius:13,marginBottom:7,border:isExp?"1px solid rgba(32,201,151,0.2)":"1px solid #1a1a25",overflow:"hidden"}}>
+          <div onClick={() => {if(!isEdit){setExp(isExp?null:hid);setEditing(null)}}} style={{padding:"14px 16px",cursor:"pointer"}}>
+            <div style={{display:"flex",alignItems:"center",gap:10}}>
+              <span style={{fontSize:SZ.icon}}>🥾</span>
+              <div style={{flex:1}}>
+                <p style={{color:"#eee",fontSize:SZ.md,fontWeight:600,margin:0}}>{h.trail||"Unnamed"}</p>
+                <p style={{color:"#999",fontSize:SZ.sm,margin:"2px 0 0"}}>{h.distance&&`${h.distance}km`}{h.elevation&&` · ↑${h.elevation}m`}{h.wx&&` · ${h.wx}`}</p>
+              </div>
+              <span style={{color:h.difficulty==="Expert"?"#ff4757":h.difficulty==="Hard"?"#ffa94d":h.difficulty==="Moderate"?"#ffd43b":"#51cf66",fontSize:SZ.xs,fontWeight:600,padding:"3px 8px",borderRadius:6,background:"rgba(255,255,255,0.05)"}}>{h.difficulty}</span>
+              <span style={{color:"#555",fontSize:SZ.xs}}>{isExp?"▼":"›"}</span>
+            </div>
+          </div>
+          {isExp&&!isEdit&&<div style={{padding:"0 16px 14px",borderTop:"1px solid #1a1a25"}}>
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr 1fr",gap:6,margin:"12px 0 8px"}}>
+              {[{l:"📏",v:h.distance?`${h.distance}km`:"–"},{l:"⛰️",v:h.elevation?`${h.elevation}m`:"–"},{l:"⏱",v:h.duration?`${h.duration}min`:"–"},{l:"🌤️",v:h.wx||"–"}].map(x=>(<div key={x.l} style={{background:"#0a0a14",borderRadius:8,padding:"7px",textAlign:"center"}}><p style={{color:"#777",fontSize:10,margin:0}}>{x.l}</p><p style={{color:"#ccc",fontSize:SZ.sm,fontWeight:600,margin:"2px 0 0"}}>{x.v}</p></div>))}
+            </div>
+            {h.temp&&<p style={{color:"#20c997",fontSize:SZ.sm,margin:"0 0 4px"}}>🌡️ {h.temp}°C</p>}
+            {h.date&&<p style={{color:"#777",fontSize:SZ.xs,margin:"0 0 4px"}}>📅 {new Date(h.date).toLocaleDateString("en",{weekday:"long",day:"numeric",month:"long"})}</p>}
+            {h.note&&<p style={{color:"#777",fontSize:SZ.sm,margin:"0 0 10px",fontStyle:"italic"}}>{h.note}</p>}
+            <div style={{display:"flex",gap:8}}>
+              <button onClick={() => startEdit(h)} style={{flex:1,padding:"12px",borderRadius:10,border:"none",background:"#00d2ff",color:"#000",fontSize:SZ.md,fontWeight:700,cursor:"pointer"}}>✏️ {t("edit")}</button>
+              <button onClick={() => onDel(hid)} style={{flex:1,padding:"12px",borderRadius:10,border:"none",background:"#ff4757",color:"#fff",fontSize:SZ.md,fontWeight:700,cursor:"pointer"}}>🗑️</button>
+            </div>
+          </div>}
+          {isEdit&&<div style={{padding:"0 16px 14px",borderTop:"1px solid rgba(0,210,255,0.3)"}}>
+            <input type="text" value={ef.trail||""} onChange={e=>setEf({...ef,trail:e.target.value})} style={{width:"100%",padding:"9px",borderRadius:9,border:"1px solid #222",background:"#0a0a14",color:"#fff",fontSize:SZ.md,outline:"none",boxSizing:"border-box",margin:"12px 0 8px"}}/>
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:7,marginBottom:8}}>
+              {[{k:"distance",l:t("distance")},{k:"elevation",l:t("elevation")},{k:"duration",l:t("duration")}].map(x=>(<div key={x.k}><label style={{color:"#999",fontSize:SZ.xs}}>{x.l}</label><input type="number" inputMode="decimal" value={ef[x.k]||""} onChange={e=>setEf({...ef,[x.k]:e.target.value})} style={{width:"100%",padding:"8px",borderRadius:8,border:"1px solid #222",background:"#0a0a14",color:"#fff",fontSize:SZ.md,fontFamily:Mo,outline:"none",boxSizing:"border-box"}}/></div>))}
+            </div>
+            <input type="text" value={ef.note||""} onChange={e=>setEf({...ef,note:e.target.value})} placeholder={t("notes")} style={{width:"100%",padding:"9px",borderRadius:9,border:"1px solid #222",background:"#0a0a14",color:"#999",fontSize:SZ.sm,outline:"none",boxSizing:"border-box",marginBottom:8}}/>
+            <div style={{display:"flex",gap:8}}>
+              <button onClick={saveEdit} style={{flex:1,padding:"12px",borderRadius:10,border:"none",background:"#20c997",color:"#000",fontSize:SZ.md,fontWeight:700,cursor:"pointer"}}>✓ {t("save")}</button>
+              <button onClick={() => setEditing(null)} style={{flex:1,padding:"12px",borderRadius:10,border:"1px solid #333",background:"none",color:"#999",fontSize:SZ.md,fontWeight:600,cursor:"pointer"}}>{t("cancel")}</button>
+            </div>
+          </div>}
+        </div>
+    )})}
+  </div>);
+}
+
+function FingerLog({finger,week,onSave,onDel,onUpd}) {
+  const [show,setShow] = useState(false);
+  const [exp,setExp] = useState(null);
+  const [editing,setEditing] = useState(null);
+  const [ef,setEf] = useState({});
+  const [f,setF] = useState({grip:"Half crimp",weight:0,hangTime:10,edgeSize:20,note:""});
+  const wk=finger.filter(x=>x.week===week);
+  const startEdit = (x) => { setEditing(String(x.id||x.date)); setEf({...x}); };
+  const saveEdit = () => { onUpd(editing, ef); setEditing(null); };
+  return (<div>
+    <button onClick={() => setShow(!show)} style={{width:"100%",padding:"12px",borderRadius:13,border:"1px dashed #ffa94d",background:show?"rgba(255,169,77,0.07)":"none",color:"#ffa94d",fontSize:SZ.cardSub,fontWeight:600,cursor:"pointer",marginBottom:12}}>{show?t("cancel"):t("hangboard")}</button>
+    {show&&<div style={{background:"#111118",borderRadius:14,padding:"16px",border:"1px solid #1a1a25",marginBottom:12}}>
+      <div style={{marginBottom:8}}><label style={{color:"#999",fontSize:SZ.xs}}>GRIP</label><select value={f.grip} onChange={e=>setF({...f,grip:e.target.value})} style={{width:"100%",padding:"9px",borderRadius:9,border:"1px solid #222",background:"#0a0a14",color:"#fff",fontSize:SZ.cardSub,outline:"none"}}>{GRIPS.map(g=><option key={g} value={g}>{g}</option>)}</select></div>
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:7,marginBottom:8}}>{[{k:"weight",l:"+KG"},{k:"hangTime",l:"Hang (s)"},{k:"edgeSize",l:"Edge (mm)"}].map(x=>(<div key={x.k}><label style={{color:"#999",fontSize:SZ.xs}}>{x.l}</label><input type="number" inputMode="decimal" value={f[x.k]} onChange={e=>setF({...f,[x.k]:e.target.value})} style={{width:"100%",padding:"8px",borderRadius:8,border:"1px solid #222",background:"#0a0a14",color:"#fff",fontSize:SZ.md,fontFamily:Mo,outline:"none",boxSizing:"border-box"}}/></div>))}</div>
+      <input type="text" placeholder={t("notes")} value={f.note} onChange={e=>setF({...f,note:e.target.value})} style={{width:"100%",padding:"9px",borderRadius:9,border:"1px solid #222",background:"#0a0a14",color:"#999",fontSize:SZ.sm,outline:"none",boxSizing:"border-box",marginBottom:8}}/>
+      <button onClick={() => {onSave(f);setShow(false)}} style={{width:"100%",padding:"12px",borderRadius:11,border:"none",background:"#ffa94d",color:"#000",fontSize:SZ.md,fontWeight:700,cursor:"pointer"}}>{t("save")}</button>
+    </div>}
+    {wk.length===0?<p style={{color:"#555",fontSize:SZ.cardSub,textAlign:"center",padding:20}}>No data for W{week}</p>:wk.map((x,i)=>{
+      const xid=String(x.id||x.date||i); const isExp=exp===xid; const isEdit=editing===xid;
+      return (
+        <div key={xid} style={{background:"#111118",borderRadius:13,marginBottom:7,border:isExp?"1px solid rgba(255,169,77,0.2)":"1px solid #1a1a25",overflow:"hidden"}}>
+          <div onClick={() => {if(!isEdit){setExp(isExp?null:xid);setEditing(null)}}} style={{padding:"12px 14px",cursor:"pointer",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+            <div>
+              <p style={{color:"#eee",fontSize:SZ.cardSub,fontWeight:600,margin:0}}>🤏 {x.grip}</p>
+              <p style={{color:"#999",fontSize:SZ.sm,margin:"2px 0 0"}}>{x.hangTime}s · {x.edgeSize}mm</p>
+            </div>
+            <div style={{display:"flex",alignItems:"center",gap:8}}>
+              <span style={{color:"#ffa94d",fontSize:SZ.md,fontWeight:700,fontFamily:Mo}}>+{x.weight}kg</span>
+              <span style={{color:"#555",fontSize:SZ.xs}}>{isExp?"▼":"›"}</span>
+            </div>
+          </div>
+          {isExp&&!isEdit&&<div style={{padding:"0 14px 14px",borderTop:"1px solid #1a1a25"}}>
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr 1fr",gap:6,margin:"12px 0 8px"}}>
+              {[{l:"🤏",v:x.grip},{l:"🏋️",v:`+${x.weight}kg`},{l:"⏱",v:`${x.hangTime}s`},{l:"📏",v:`${x.edgeSize}mm`}].map(m=>(<div key={m.l} style={{background:"#0a0a14",borderRadius:8,padding:"7px",textAlign:"center"}}><p style={{color:"#777",fontSize:10,margin:0}}>{m.l}</p><p style={{color:"#ccc",fontSize:SZ.sm,fontWeight:600,margin:"2px 0 0"}}>{m.v}</p></div>))}
+            </div>
+            {x.date&&<p style={{color:"#777",fontSize:SZ.xs,margin:"0 0 4px"}}>📅 {new Date(x.date).toLocaleDateString("en",{weekday:"long",day:"numeric",month:"long"})}</p>}
+            {x.note&&<p style={{color:"#777",fontSize:SZ.sm,margin:"0 0 10px",fontStyle:"italic"}}>{x.note}</p>}
+            <div style={{display:"flex",gap:8}}>
+              <button onClick={() => startEdit(x)} style={{flex:1,padding:"12px",borderRadius:10,border:"none",background:"#00d2ff",color:"#000",fontSize:SZ.md,fontWeight:700,cursor:"pointer"}}>✏️ {t("edit")}</button>
+              <button onClick={() => onDel(xid)} style={{flex:1,padding:"12px",borderRadius:10,border:"none",background:"#ff4757",color:"#fff",fontSize:SZ.md,fontWeight:700,cursor:"pointer"}}>🗑️</button>
+            </div>
+          </div>}
+          {isEdit&&<div style={{padding:"0 14px 14px",borderTop:"1px solid rgba(0,210,255,0.3)"}}>
+            <div style={{marginTop:12,marginBottom:8}}><label style={{color:"#999",fontSize:SZ.xs}}>GRIP</label><select value={ef.grip} onChange={e=>setEf({...ef,grip:e.target.value})} style={{width:"100%",padding:"9px",borderRadius:9,border:"1px solid #222",background:"#0a0a14",color:"#fff",fontSize:SZ.cardSub,outline:"none"}}>{GRIPS.map(g=><option key={g} value={g}>{g}</option>)}</select></div>
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:7,marginBottom:8}}>{[{k:"weight",l:"+KG"},{k:"hangTime",l:"Hang (s)"},{k:"edgeSize",l:"Edge (mm)"}].map(x=>(<div key={x.k}><label style={{color:"#999",fontSize:SZ.xs}}>{x.l}</label><input type="number" inputMode="decimal" value={ef[x.k]||""} onChange={e=>setEf({...ef,[x.k]:e.target.value})} style={{width:"100%",padding:"8px",borderRadius:8,border:"1px solid #222",background:"#0a0a14",color:"#fff",fontSize:SZ.md,fontFamily:Mo,outline:"none",boxSizing:"border-box"}}/></div>))}</div>
+            <input type="text" value={ef.note||""} onChange={e=>setEf({...ef,note:e.target.value})} placeholder={t("notes")} style={{width:"100%",padding:"9px",borderRadius:9,border:"1px solid #222",background:"#0a0a14",color:"#999",fontSize:SZ.sm,outline:"none",boxSizing:"border-box",marginBottom:8}}/>
+            <div style={{display:"flex",gap:8}}>
+              <button onClick={saveEdit} style={{flex:1,padding:"12px",borderRadius:10,border:"none",background:"#ffa94d",color:"#000",fontSize:SZ.md,fontWeight:700,cursor:"pointer"}}>✓ {t("save")}</button>
+              <button onClick={() => setEditing(null)} style={{flex:1,padding:"12px",borderRadius:10,border:"1px solid #333",background:"none",color:"#999",fontSize:SZ.md,fontWeight:600,cursor:"pointer"}}>{t("cancel")}</button>
+            </div>
+          </div>}
+        </div>
+    )})}
+  </div>);
+}
+
+/* ═══ RUN LOG ═══ */
+function RunLog({runs,week,onSave,onDel,onUpd}) {
+  const [show,setShow] = useState(false);
+  const [exp,setExp] = useState(null);
+  const [editing,setEditing] = useState(null);
+  const [ef,setEf] = useState({});
+  const FEEL = ["😤","😐","🙂","😊","🔥"];
+  const [f,setF] = useState({route:"",distance:"",duration:"",hr:"",feel:"🙂",wx:"",temp:"",note:""});
+  const wk=runs.filter(r=>r.week===week);
+  const pace = (d,m) => {const dk=+d,mk=+m;if(!dk||!mk)return"–";const p=mk/dk;return `${Math.floor(p)}'${String(Math.round((p%1)*60)).padStart(2,"0")}" /km`};
+  const startEdit = (r) => { setEditing(String(r.id||r.date)); setEf({...r}); };
+  const saveEdit = () => { onUpd(editing,ef); setEditing(null); };
+  return (<div>
+    <button onClick={() => setShow(!show)} style={{width:"100%",padding:"12px",borderRadius:13,border:"1px dashed #339af0",background:show?"rgba(51,154,240,0.07)":"none",color:"#339af0",fontSize:SZ.cardSub,fontWeight:600,cursor:"pointer",marginBottom:12}}>{show?t("cancel"):t("new_run")}</button>
+    {show&&<div style={{background:"#111118",borderRadius:14,padding:"16px",border:"1px solid #1a1a25",marginBottom:12}}>
+      <input type="text" placeholder={t("run_route")} value={f.route} onChange={e=>setF({...f,route:e.target.value})} style={{width:"100%",padding:"10px",borderRadius:10,border:"1px solid #222",background:"#0a0a14",color:"#fff",fontSize:SZ.md,outline:"none",boxSizing:"border-box",marginBottom:8}}/>
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:7,marginBottom:8}}>
+        <div><label style={{color:"#999",fontSize:SZ.xs}}>{t("run_dist")}</label><input type="number" inputMode="decimal" value={f.distance} onChange={e=>setF({...f,distance:e.target.value})} style={{width:"100%",padding:"8px",borderRadius:8,border:"1px solid #222",background:"#0a0a14",color:"#fff",fontSize:SZ.md,fontFamily:Mo,outline:"none",boxSizing:"border-box"}}/></div>
+        <div><label style={{color:"#999",fontSize:SZ.xs}}>{t("run_dur")}</label><input type="number" inputMode="numeric" value={f.duration} onChange={e=>setF({...f,duration:e.target.value})} style={{width:"100%",padding:"8px",borderRadius:8,border:"1px solid #222",background:"#0a0a14",color:"#fff",fontSize:SZ.md,fontFamily:Mo,outline:"none",boxSizing:"border-box"}}/></div>
+        <div><label style={{color:"#999",fontSize:SZ.xs}}>{t("run_hr")}</label><input type="number" inputMode="numeric" placeholder="–" value={f.hr} onChange={e=>setF({...f,hr:e.target.value})} style={{width:"100%",padding:"8px",borderRadius:8,border:"1px solid #222",background:"#0a0a14",color:"#fff",fontSize:SZ.md,fontFamily:Mo,outline:"none",boxSizing:"border-box"}}/></div>
+      </div>
+      <div style={{marginBottom:8}}><label style={{color:"#999",fontSize:SZ.xs}}>{t("run_feel")}</label><div style={{display:"flex",gap:6,marginTop:4}}>{FEEL.map(e=>(<button key={e} onClick={() => setF({...f,feel:e})} style={{flex:1,padding:"8px",borderRadius:8,border:"none",background:f.feel===e?"rgba(51,154,240,0.15)":"#1a1a25",fontSize:SZ.lg,cursor:"pointer"}}>{e}</button>))}</div></div>
+      <input type="text" placeholder={t("notes")} value={f.note} onChange={e=>setF({...f,note:e.target.value})} style={{width:"100%",padding:"9px",borderRadius:9,border:"1px solid #222",background:"#0a0a14",color:"#999",fontSize:SZ.sm,outline:"none",boxSizing:"border-box",marginBottom:8}}/>
+      <button onClick={() => {if(+f.distance>0||+f.duration>0){onSave(f);setShow(false);setF({route:"",distance:"",duration:"",hr:"",feel:"🙂",wx:"",temp:"",note:""})}}} style={{width:"100%",padding:"12px",borderRadius:11,border:"none",background:"#339af0",color:"#fff",fontSize:SZ.md,fontWeight:700,cursor:"pointer"}}>{t("save_run")}</button>
+    </div>}
+    {wk.length===0?<p style={{color:"#555",fontSize:SZ.cardSub,textAlign:"center",padding:20}}>{t("no_runs")} W{week}</p>:wk.map((r,i)=>{
+      const rid=String(r.id||r.date||i);const isExp=exp===rid;const isEdit=editing===rid;
+      return (
+        <div key={rid} style={{background:"#111118",borderRadius:13,marginBottom:7,border:isExp?"1px solid rgba(51,154,240,0.2)":"1px solid #1a1a25",overflow:"hidden"}}>
+          <div onClick={() => {if(!isEdit){setExp(isExp?null:rid);setEditing(null)}}} style={{padding:"14px 16px",cursor:"pointer"}}>
+            <div style={{display:"flex",alignItems:"center",gap:10}}>
+              <span style={{fontSize:SZ.icon}}>🏃</span>
+              <div style={{flex:1}}>
+                <p style={{color:"#eee",fontSize:SZ.md,fontWeight:600,margin:0}}>{r.route||`${r.distance||"?"}km`} <span style={{color:"#339af0",fontWeight:400,fontSize:SZ.sm}}>{pace(r.distance,r.duration)}</span></p>
+                <p style={{color:"#999",fontSize:SZ.sm,margin:"2px 0 0"}}>{r.distance&&`${r.distance}km`}{r.duration&&` · ${r.duration}min`}{r.hr&&` · ❤️${r.hr}`} {r.feel||""}</p>
+              </div>
+              <span style={{color:"#555",fontSize:SZ.xs}}>{r.date?new Date(r.date).toLocaleDateString("en",{day:"numeric",month:"short"}):""} {isExp?"▼":"›"}</span>
+            </div>
+          </div>
+          {isExp&&!isEdit&&<div style={{padding:"0 16px 14px",borderTop:"1px solid #1a1a25"}}>
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr 1fr",gap:6,margin:"12px 0 8px"}}>
+              {[{l:"📏",v:r.distance?`${r.distance}km`:"–"},{l:"⏱",v:r.duration?`${r.duration}min`:"–"},{l:"⚡",v:pace(r.distance,r.duration)},{l:"❤️",v:r.hr?`${r.hr}bpm`:"–"}].map(x=>(<div key={x.l} style={{background:"#0a0a14",borderRadius:8,padding:"7px",textAlign:"center"}}><p style={{color:"#777",fontSize:10,margin:0}}>{x.l}</p><p style={{color:"#ccc",fontSize:SZ.sm,fontWeight:600,margin:"2px 0 0"}}>{x.v}</p></div>))}
+            </div>
+            {r.note&&<p style={{color:"#777",fontSize:SZ.sm,margin:"0 0 10px",fontStyle:"italic"}}>{r.note}</p>}
+            <div style={{display:"flex",gap:8}}>
+              <button onClick={() => startEdit(r)} style={{flex:1,padding:"12px",borderRadius:10,border:"none",background:"#00d2ff",color:"#000",fontSize:SZ.md,fontWeight:700,cursor:"pointer"}}>✏️ {t("edit")}</button>
+              <button onClick={() => onDel(rid)} style={{flex:1,padding:"12px",borderRadius:10,border:"none",background:"#ff4757",color:"#fff",fontSize:SZ.md,fontWeight:700,cursor:"pointer"}}>🗑️</button>
+            </div>
+          </div>}
+          {isEdit&&<div style={{padding:"0 16px 14px",borderTop:"1px solid rgba(0,210,255,0.3)"}}>
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:7,margin:"12px 0 8px"}}>
+              <div><label style={{color:"#999",fontSize:SZ.xs}}>{t("run_dist")}</label><input type="number" inputMode="decimal" value={ef.distance||""} onChange={e=>setEf({...ef,distance:e.target.value})} style={{width:"100%",padding:"8px",borderRadius:8,border:"1px solid #222",background:"#0a0a14",color:"#fff",fontSize:SZ.md,fontFamily:Mo,outline:"none",boxSizing:"border-box"}}/></div>
+              <div><label style={{color:"#999",fontSize:SZ.xs}}>{t("run_dur")}</label><input type="number" inputMode="numeric" value={ef.duration||""} onChange={e=>setEf({...ef,duration:e.target.value})} style={{width:"100%",padding:"8px",borderRadius:8,border:"1px solid #222",background:"#0a0a14",color:"#fff",fontSize:SZ.md,fontFamily:Mo,outline:"none",boxSizing:"border-box"}}/></div>
+              <div><label style={{color:"#999",fontSize:SZ.xs}}>{t("run_hr")}</label><input type="number" inputMode="numeric" value={ef.hr||""} onChange={e=>setEf({...ef,hr:e.target.value})} style={{width:"100%",padding:"8px",borderRadius:8,border:"1px solid #222",background:"#0a0a14",color:"#fff",fontSize:SZ.md,fontFamily:Mo,outline:"none",boxSizing:"border-box"}}/></div>
+            </div>
+            <input type="text" value={ef.note||""} onChange={e=>setEf({...ef,note:e.target.value})} placeholder={t("notes")} style={{width:"100%",padding:"9px",borderRadius:9,border:"1px solid #222",background:"#0a0a14",color:"#999",fontSize:SZ.sm,outline:"none",boxSizing:"border-box",marginBottom:8}}/>
+            <div style={{display:"flex",gap:8}}>
+              <button onClick={saveEdit} style={{flex:1,padding:"12px",borderRadius:10,border:"none",background:"#339af0",color:"#fff",fontSize:SZ.md,fontWeight:700,cursor:"pointer"}}>✓ {t("save")}</button>
+              <button onClick={() => setEditing(null)} style={{flex:1,padding:"12px",borderRadius:10,border:"1px solid #333",background:"none",color:"#999",fontSize:SZ.md,fontWeight:600,cursor:"pointer"}}>{t("cancel")}</button>
+            </div>
+          </div>}
+        </div>
+    )})}
+  </div>);
+}
+
+/* ═══ YOGA LOG ═══ */
+function YogaLog({yogas,week,onSave,onDel,onUpd}) {
+  const [show,setShow] = useState(false);
+  const [exp,setExp] = useState(null);
+  const [editing,setEditing] = useState(null);
+  const [ef,setEf] = useState({});
+  const TYPES = ["Vinyasa","Hatha","Yin","Power","Restorative","Ashtanga","Mobility"];
+  const FOCUS = [LANG==="hr"?"Cijelo tijelo":LANG==="de"?"Ganzkörper":"Full body",LANG==="hr"?"Fleksibilnost":LANG==="de"?"Flexibilität":"Flexibility",LANG==="hr"?"Snaga":LANG==="de"?"Stärke":"Strength",LANG==="hr"?"Balans":LANG==="de"?"Balance":"Balance",LANG==="hr"?"Oporavak":LANG==="de"?"Erholung":"Recovery",LANG==="hr"?"Disanje":LANG==="de"?"Atmung":"Breathwork"];
+  const [f,setF] = useState({type:"Vinyasa",duration:"",focus:"",note:""});
+  const wk=yogas.filter(y=>y.week===week);
+  const startEdit = (y) => { setEditing(String(y.id||y.date)); setEf({...y}); };
+  const saveEdit = () => { onUpd(editing,ef); setEditing(null); };
+  return (<div>
+    <button onClick={() => setShow(!show)} style={{width:"100%",padding:"12px",borderRadius:13,border:"1px dashed #cc5de8",background:show?"rgba(204,93,232,0.07)":"none",color:"#cc5de8",fontSize:SZ.cardSub,fontWeight:600,cursor:"pointer",marginBottom:12}}>{show?t("cancel"):t("new_yoga")}</button>
+    {show&&<div style={{background:"#111118",borderRadius:14,padding:"16px",border:"1px solid #1a1a25",marginBottom:12}}>
+      <div style={{marginBottom:8}}><label style={{color:"#999",fontSize:SZ.xs}}>{t("yoga_type")}</label><div style={{display:"flex",gap:5,marginTop:4,flexWrap:"wrap"}}>{TYPES.map(ty=>(<button key={ty} onClick={() => setF({...f,type:ty})} style={{padding:"7px 12px",borderRadius:8,border:"none",background:f.type===ty?"#cc5de8":"#1a1a25",color:f.type===ty?"#fff":"#999",fontSize:SZ.xs,fontWeight:600,cursor:"pointer"}}>{ty}</button>))}</div></div>
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:8}}>
+        <div><label style={{color:"#999",fontSize:SZ.xs}}>{t("yoga_dur")}</label><input type="number" inputMode="numeric" value={f.duration} onChange={e=>setF({...f,duration:e.target.value})} style={{width:"100%",padding:"9px",borderRadius:9,border:"1px solid #222",background:"#0a0a14",color:"#fff",fontSize:SZ.md,fontFamily:Mo,outline:"none",boxSizing:"border-box"}}/></div>
+        <div><label style={{color:"#999",fontSize:SZ.xs}}>{t("yoga_focus")}</label><select value={f.focus} onChange={e=>setF({...f,focus:e.target.value})} style={{width:"100%",padding:"9px",borderRadius:9,border:"1px solid #222",background:"#0a0a14",color:f.focus?"#fff":"#555",fontSize:SZ.sm,outline:"none"}}><option value="">{t("select")}</option>{FOCUS.map(fc=>(<option key={fc} value={fc}>{fc}</option>))}</select></div>
+      </div>
+      <input type="text" placeholder={t("notes")} value={f.note} onChange={e=>setF({...f,note:e.target.value})} style={{width:"100%",padding:"9px",borderRadius:9,border:"1px solid #222",background:"#0a0a14",color:"#999",fontSize:SZ.sm,outline:"none",boxSizing:"border-box",marginBottom:8}}/>
+      <button onClick={() => {if(+f.duration>0){onSave(f);setShow(false);setF({type:"Vinyasa",duration:"",focus:"",note:""})}}} style={{width:"100%",padding:"12px",borderRadius:11,border:"none",background:"#cc5de8",color:"#fff",fontSize:SZ.md,fontWeight:700,cursor:"pointer"}}>{t("save_yoga")}</button>
+    </div>}
+    {wk.length===0?<p style={{color:"#555",fontSize:SZ.cardSub,textAlign:"center",padding:20}}>{t("no_yoga")} W{week}</p>:wk.map((y,i)=>{
+      const yid=String(y.id||y.date||i);const isExp=exp===yid;const isEdit=editing===yid;
+      return (
+        <div key={yid} style={{background:"#111118",borderRadius:13,marginBottom:7,border:isExp?"1px solid rgba(204,93,232,0.2)":"1px solid #1a1a25",overflow:"hidden"}}>
+          <div onClick={() => {if(!isEdit){setExp(isExp?null:yid);setEditing(null)}}} style={{padding:"14px 16px",cursor:"pointer"}}>
+            <div style={{display:"flex",alignItems:"center",gap:10}}>
+              <span style={{fontSize:SZ.icon}}>🧘</span>
+              <div style={{flex:1}}>
+                <p style={{color:"#eee",fontSize:SZ.md,fontWeight:600,margin:0}}>{y.type} <span style={{color:"#cc5de8",fontWeight:400,fontSize:SZ.sm}}>{y.duration}min</span></p>
+                <p style={{color:"#999",fontSize:SZ.sm,margin:"2px 0 0"}}>{y.focus||""}</p>
+              </div>
+              <span style={{color:"#555",fontSize:SZ.xs}}>{y.date?new Date(y.date).toLocaleDateString("en",{day:"numeric",month:"short"}):""} {isExp?"▼":"›"}</span>
+            </div>
+          </div>
+          {isExp&&!isEdit&&<div style={{padding:"0 16px 14px",borderTop:"1px solid #1a1a25"}}>
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:6,margin:"12px 0 8px"}}>
+              {[{l:"🧘",v:y.type},{l:"⏱",v:`${y.duration}min`},{l:"🎯",v:y.focus||"–"}].map(x=>(<div key={x.l} style={{background:"#0a0a14",borderRadius:8,padding:"7px",textAlign:"center"}}><p style={{color:"#777",fontSize:10,margin:0}}>{x.l}</p><p style={{color:"#ccc",fontSize:SZ.sm,fontWeight:600,margin:"2px 0 0"}}>{x.v}</p></div>))}
+            </div>
+            {y.date&&<p style={{color:"#777",fontSize:SZ.xs,margin:"0 0 4px"}}>📅 {new Date(y.date).toLocaleDateString("en",{weekday:"long",day:"numeric",month:"long"})}</p>}
+            {y.note&&<p style={{color:"#777",fontSize:SZ.sm,margin:"0 0 10px",fontStyle:"italic"}}>{y.note}</p>}
+            <div style={{display:"flex",gap:8}}>
+              <button onClick={() => startEdit(y)} style={{flex:1,padding:"12px",borderRadius:10,border:"none",background:"#00d2ff",color:"#000",fontSize:SZ.md,fontWeight:700,cursor:"pointer"}}>✏️ {t("edit")}</button>
+              <button onClick={() => onDel(yid)} style={{flex:1,padding:"12px",borderRadius:10,border:"none",background:"#ff4757",color:"#fff",fontSize:SZ.md,fontWeight:700,cursor:"pointer"}}>🗑️</button>
+            </div>
+          </div>}
+          {isEdit&&<div style={{padding:"0 16px 14px",borderTop:"1px solid rgba(0,210,255,0.3)"}}>
+            <div style={{marginTop:12,marginBottom:8}}><label style={{color:"#999",fontSize:SZ.xs}}>{t("yoga_type")}</label><div style={{display:"flex",gap:5,marginTop:4,flexWrap:"wrap"}}>{TYPES.map(ty=>(<button key={ty} onClick={() => setEf({...ef,type:ty})} style={{padding:"7px 12px",borderRadius:8,border:"none",background:ef.type===ty?"#cc5de8":"#1a1a25",color:ef.type===ty?"#fff":"#999",fontSize:SZ.xs,fontWeight:600,cursor:"pointer"}}>{ty}</button>))}</div></div>
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:8}}>
+              <div><label style={{color:"#999",fontSize:SZ.xs}}>{t("yoga_dur")}</label><input type="number" inputMode="numeric" value={ef.duration||""} onChange={e=>setEf({...ef,duration:e.target.value})} style={{width:"100%",padding:"9px",borderRadius:9,border:"1px solid #222",background:"#0a0a14",color:"#fff",fontSize:SZ.md,fontFamily:Mo,outline:"none",boxSizing:"border-box"}}/></div>
+              <div><label style={{color:"#999",fontSize:SZ.xs}}>{t("yoga_focus")}</label><select value={ef.focus||""} onChange={e=>setEf({...ef,focus:e.target.value})} style={{width:"100%",padding:"9px",borderRadius:9,border:"1px solid #222",background:"#0a0a14",color:"#fff",fontSize:SZ.sm,outline:"none"}}><option value="">{t("select")}</option>{FOCUS.map(fc=>(<option key={fc} value={fc}>{fc}</option>))}</select></div>
+            </div>
+            <input type="text" value={ef.note||""} onChange={e=>setEf({...ef,note:e.target.value})} placeholder={t("notes")} style={{width:"100%",padding:"9px",borderRadius:9,border:"1px solid #222",background:"#0a0a14",color:"#999",fontSize:SZ.sm,outline:"none",boxSizing:"border-box",marginBottom:8}}/>
+            <div style={{display:"flex",gap:8}}>
+              <button onClick={saveEdit} style={{flex:1,padding:"12px",borderRadius:10,border:"none",background:"#cc5de8",color:"#fff",fontSize:SZ.md,fontWeight:700,cursor:"pointer"}}>✓ {t("save")}</button>
+              <button onClick={() => setEditing(null)} style={{flex:1,padding:"12px",borderRadius:10,border:"1px solid #333",background:"none",color:"#999",fontSize:SZ.md,fontWeight:600,cursor:"pointer"}}>{t("cancel")}</button>
+            </div>
+          </div>}
+        </div>
+    )})}
+  </div>);
+}
+
+/* ═══ MOUNT ═══ */
+const root = ReactDOM.createRoot(document.getElementById("root"));
+root.render(<App />);
+</script>
+</body>
+</html>
